@@ -101,7 +101,7 @@ router.post('/clients', (req, res) => {
     const { name, aiProvider, aiKey, systemPrompt, plan, googleSheetWebhook, reportPhone,
             clientUsername, clientPassword, permissions,
             greenApiInstanceId, greenApiToken, ownerPhone, leadGroup,
-            metaPhoneNumberId, metaAccessToken, metaVerifyToken,
+            metaPhoneNumberId, metaAccessToken, metaVerifyToken, metaWabaId,
             businessHoursEnabled, businessHoursStart, businessHoursEnd, businessClosedMessage, typingDelayEnabled } = req.body;
     console.log('[Admin] POST /clients — name:', name);
     if (!name || !aiProvider || !aiKey || !systemPrompt) {
@@ -129,6 +129,7 @@ router.post('/clients', (req, res) => {
       metaPhoneNumberId: metaPhoneNumberId || '',
       metaAccessToken: metaAccessToken || '',
       metaVerifyToken: metaVerifyToken || '',
+      metaWabaId: metaWabaId || '',
       businessHoursEnabled: businessHoursEnabled || false,
       businessHoursStart: businessHoursStart || '09:00',
       businessHoursEnd: businessHoursEnd || '20:00',
@@ -177,6 +178,7 @@ router.put('/clients/:id', (req, res) => {
     if (body.metaPhoneNumberId !== undefined)      updates.metaPhoneNumberId = body.metaPhoneNumberId;
     if (body.metaAccessToken !== undefined)        updates.metaAccessToken = body.metaAccessToken;
     if (body.metaVerifyToken !== undefined)        updates.metaVerifyToken = body.metaVerifyToken;
+    if (body.metaWabaId !== undefined)             updates.metaWabaId = body.metaWabaId;
     if (body.businessHoursEnabled !== undefined)   updates.businessHoursEnabled = body.businessHoursEnabled;
     if (body.businessHoursStart !== undefined)     updates.businessHoursStart = body.businessHoursStart;
     if (body.businessHoursEnd !== undefined)       updates.businessHoursEnd = body.businessHoursEnd;

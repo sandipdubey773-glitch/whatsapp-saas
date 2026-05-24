@@ -232,7 +232,7 @@ export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs 
 
       {/* WhatsApp Connect Modal */}
       {showWA && (
-        <div className="modal-overlay" onClick={() => setShowWA(false)}>
+        <div className="modal-overlay" onClick={() => { setShowWA(false); setWaPhone(''); setQrCode(''); setPairingCode(''); setWaError(''); }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3 className="modal__title">WhatsApp — {client.name}</h3>
 
@@ -291,7 +291,7 @@ export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs 
             {waError && <div style={{ marginTop: '12px', color: '#ef4444', fontSize: '0.8rem' }}>⚠️ {waError}</div>}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowWA(false)}>Close</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => { setShowWA(false); setWaPhone(''); setQrCode(''); setPairingCode(''); setWaError(''); }}>Close</button>
             </div>
           </div>
         </div>

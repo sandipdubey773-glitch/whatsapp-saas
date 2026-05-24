@@ -546,7 +546,7 @@ export default function ClientPortal({ onLogout }) {
                       {(inboxSel.messages||[]).map((msg,i)=>{
                         const isBot=msg.role==='assistant';
                         return (
-                          <div key={i} style={{ display:'flex', justifyContent:isBot?'flex-end':'flex-start' }}>
+                          <div key={msg.timestamp ? `${msg.timestamp}-${i}` : i} style={{ display:'flex', justifyContent:isBot?'flex-end':'flex-start' }}>
                             {!isBot && <div style={{ width:24, height:24, borderRadius:'50%', background:'#1e293b', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, marginRight:6, flexShrink:0, alignSelf:'flex-end', color:'#64748b' }}>👤</div>}
                             <div style={{ maxWidth:'68%' }}>
                               <div style={{ padding:'8px 12px', borderRadius:isBot?'14px 14px 2px 14px':'14px 14px 14px 2px', background:isBot?(msg.manual?'#0c3460':'#25d366'):'#1e293b', color:isBot?'#fff':'#e2e8f0', fontSize:12, lineHeight:1.55, border:isBot?'none':'1px solid #334155', boxShadow:'0 1px 2px rgba(0,0,0,0.3)' }}>
