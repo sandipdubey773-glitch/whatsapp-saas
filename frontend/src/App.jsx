@@ -6,6 +6,7 @@ import AddClient from './pages/AddClient';
 import InboxPage from './pages/InboxPage';
 import LeadsDashboard from './pages/LeadsDashboard';
 import ClientLogin from './pages/ClientLogin';
+import ClientLanding from './pages/ClientLanding';
 import ClientPortal from './pages/ClientPortal';
 import './styles.css';
 
@@ -45,7 +46,7 @@ export default function App() {
     <BrowserRouter basename={basename}>
       <Routes>
         <Route path="/client-login" element={
-          <ClientLogin onLogin={handleClientLogin} />
+          <ClientLanding onLogin={handleClientLogin} />
         } />
         <Route path="/client-portal" element={
           clientToken ? <ClientPortal onLogout={handleClientLogout} /> : <Navigate to="/client-login" />
