@@ -873,15 +873,28 @@ async function bootClientSession(clientId, db) {
   console.log(`[WA:${clientId}] Baileys starting...`);
 }
 
-// --- Boot all active Baileys clients on startup ---
+// --- Check if client has a saved Firebase session ---
+async function hasSavedSession(clientId) {
+  try {
+    const res = await axios.get(`${FB_BASE}/wa-session-${clientId}/creds.json`, { timeout: 5000 });
+    return !!res.data;
+  } catch(e) { return false; }
+}
+
+// --- Boot all active Baileys clients on startup (only if saved session exists) ---
 async function bootSessions(db) {
   setDB(db);
   const clients = db.get('clients').filter({ status: 'active' }).value();
-  // Only boot sessions for clients not using Meta API
   const baileyClients = clients.filter(c => !c.metaPhoneNumberId);
-  console.log('[WA] bootSessions — booting', baileyClients.length, 'Baileys session(s)');
+  console.log('[WA] bootSessions — checking', baileyClients.length, 'client(s) for saved sessions');
   for (const client of baileyClients) {
-    bootClientSession(client.id, db).catch(e => console.error('[WA] Boot error:', client.id, e.message));
+    const saved = await hasSavedSession(client.id);
+    if (saved) {
+      console.log('[WA] Saved session found for', client.name, '— booting');
+      bootClientSession(client.id, db).catch(e => console.error('[WA] Boot error:', client.id, e.message));
+    } else {
+      console.log('[WA] No saved session for', client.name, '— waiting for manual connect');
+    }
   }
 }
 

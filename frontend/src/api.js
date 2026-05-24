@@ -59,4 +59,7 @@ export const clientApi = {
   sendClientMsg:   (to, text)     => axios.post(`${BASE}/client/send-message`, { to, text },                       { headers: clientHeaders() }),
   clientBotToggle: (convId)       => axios.post(`${BASE}/client/conversations/${convId}/bot-toggle`, {},            { headers: clientHeaders() }),
   clientResolve:   (convId)       => axios.post(`${BASE}/client/conversations/${convId}/resolve`, {},               { headers: clientHeaders() }),
+  getWAStatus:     ()             => axios.get(`${BASE}/client/wa-status`,                                         { headers: clientHeaders() }),
+  connectWA:       (phone)        => axios.post(`${BASE}/client/wa-connect`, phone ? { phone } : {},               { headers: clientHeaders() }),
+  disconnectWA:    ()             => axios.post(`${BASE}/client/wa-disconnect`, {},                                 { headers: clientHeaders() }),
 };

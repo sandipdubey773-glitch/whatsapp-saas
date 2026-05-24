@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const clientAuth = require('../middleware/clientAuth');
-const { getStatus } = require('../services/wa-sessions');
+const { getStatus, getQRImage, getPairingCode, startClient, disconnectClient } = require('../services/wa-sessions');
 const { sendReportToClient, generateReport } = require('../services/reporter');
 const metaApi = require('../services/meta-api');
 
@@ -192,6 +192,36 @@ router.post('/conversations/:convId/resolve', (req, res) => {
   const newStatus = conv.status === 'resolved' ? 'open' : 'resolved';
   db.get('conversations').find({ id: convId }).assign({ status: newStatus }).write();
   res.json({ success: true, status: newStatus });
+});
+
+// GET /client/wa-status — QR + pairing code + connection status
+router.get('/wa-status', async (req, res) => {
+  const c = req.clientData;
+  const status = getStatus(c.id);
+  const rawQr = getQRImage(c.id);
+  let qr = null;
+  if (rawQr) {
+    try { const QRCode = require('qrcode'); qr = await QRCode.toDataURL(rawQr, { width: 256, margin: 2 }); }
+    catch(e) { qr = rawQr; }
+  }
+  res.json({ status, qr, pairingCode: getPairingCode(c.id) });
+});
+
+// POST /client/wa-connect — start Baileys session (QR or pairing code)
+router.post('/wa-connect', async (req, res) => {
+  const c = req.clientData;
+  const { phone } = req.body;
+  try {
+    startClient(c.id, phone || null).catch(e => console.error('[Client] wa-connect error:', e.message));
+    res.json({ ok: true, message: phone ? 'Pairing code 10-15 sec mein aayega' : 'QR 15-20 sec mein tayar hoga' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /client/wa-disconnect
+router.post('/wa-disconnect', (req, res) => {
+  const c = req.clientData;
+  disconnectClient(c.id);
+  res.json({ ok: true });
 });
 
 // POST /client/meta-test

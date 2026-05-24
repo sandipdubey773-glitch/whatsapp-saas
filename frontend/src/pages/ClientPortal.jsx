@@ -40,6 +40,14 @@ export default function ClientPortal({ onLogout }) {
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaTesting, setMetaTesting] = useState(false);
   const [testPhone, setTestPhone] = useState('');
+  // WA Baileys connect state
+  const [waStatus, setWaStatus] = useState('close');
+  const [waQr, setWaQr] = useState('');
+  const [waPairingCode, setWaPairingCode] = useState('');
+  const [waPhone, setWaPhone] = useState('');
+  const [waConnecting, setWaConnecting] = useState(false);
+  const [waError, setWaError] = useState('');
+  const waPollRef = useRef(null);
   // Inbox state
   const [inboxConvs, setInboxConvs] = useState([]);
   const [inboxSel, setInboxSel] = useState(null);
@@ -99,7 +107,7 @@ export default function ClientPortal({ onLogout }) {
     if (tab === 'logs' && logs.length === 0) fetchLogs();
     if (tab === 'report') fetchReportPreview();
     if (tab === 'prompt') fetchPrompt();
-    if (tab === 'meta') fetchMetaConfig();
+    if (tab === 'meta') { fetchMetaConfig(); fetchWAStatus(); }
     if (tab === 'inbox') {
       loadInbox();
       if (!inboxPollRef.current) inboxPollRef.current = setInterval(loadInbox, 5000);
@@ -108,7 +116,10 @@ export default function ClientPortal({ onLogout }) {
     }
   };
 
-  useEffect(() => () => { if (inboxPollRef.current) clearInterval(inboxPollRef.current); }, []);
+  useEffect(() => () => {
+    if (inboxPollRef.current) clearInterval(inboxPollRef.current);
+    if (waPollRef.current) clearInterval(waPollRef.current);
+  }, []);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [inboxSel?.messages?.length]);
 
   const handleToggle = async () => {
@@ -134,6 +145,53 @@ export default function ClientPortal({ onLogout }) {
       setMetaConfig(r.data);
       setMetaForm(f => ({ ...f, metaPhoneNumberId: r.data.metaPhoneNumberId, metaVerifyToken: r.data.metaVerifyToken }));
     } catch {}
+  };
+
+  const fetchWAStatus = useCallback(async () => {
+    try {
+      const r = await clientApi.getWAStatus();
+      setWaStatus(r.data.status);
+      if (r.data.qr) setWaQr(r.data.qr);
+      if (r.data.pairingCode) setWaPairingCode(r.data.pairingCode);
+      if (r.data.status === 'open') {
+        setWaQr(''); setWaPairingCode('');
+        if (waPollRef.current) { clearInterval(waPollRef.current); waPollRef.current = null; }
+      }
+    } catch {}
+  }, []);
+
+  const startWAPoll = useCallback(() => {
+    if (waPollRef.current) clearInterval(waPollRef.current);
+    waPollRef.current = setInterval(fetchWAStatus, 3000);
+    setTimeout(() => { if (waPollRef.current) { clearInterval(waPollRef.current); waPollRef.current = null; } }, 90000);
+  }, [fetchWAStatus]);
+
+  const handleWAConnect = async () => {
+    setWaConnecting(true); setWaError(''); setWaQr(''); setWaPairingCode('');
+    try {
+      await clientApi.connectWA(waPhone.trim() || null);
+      startWAPoll();
+    } catch(e) { setWaError('Connection start nahi hua'); }
+    setWaConnecting(false);
+  };
+
+  const handleWAGetQR = async () => {
+    setWaConnecting(true); setWaError(''); setWaQr(''); setWaPairingCode('');
+    try {
+      await clientApi.connectWA(null);
+      startWAPoll();
+    } catch(e) { setWaError('QR generate nahi hua'); }
+    setWaConnecting(false);
+  };
+
+  const handleWADisconnect = async () => {
+    setWaConnecting(true);
+    try {
+      await clientApi.disconnectWA();
+      setWaStatus('close'); setWaQr(''); setWaPairingCode('');
+      if (waPollRef.current) { clearInterval(waPollRef.current); waPollRef.current = null; }
+    } catch(e) { setWaError('Disconnect failed'); }
+    setWaConnecting(false);
   };
 
   const handleSaveMeta = async () => {
@@ -526,7 +584,62 @@ export default function ClientPortal({ onLogout }) {
         {activeTab === 'meta' && (
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>WhatsApp Setup</div>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>Meta Business API se apna WhatsApp number connect karo</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>Apna WhatsApp number connect karo</div>
+
+            {/* Baileys QR Connect */}
+            <div style={{ background: '#1e293b', borderRadius: 14, padding: 20, border: '1px solid #334155', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: waStatus === 'open' ? '#25d366' : '#f87171', boxShadow: waStatus === 'open' ? '0 0 8px #25d366' : 'none' }} />
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>
+                  WhatsApp: {waStatus === 'open' ? 'Connected ✅' : 'Disconnected'}
+                </div>
+              </div>
+
+              {waStatus === 'open' ? (
+                <button onClick={handleWADisconnect} disabled={waConnecting}
+                  style={{ background: '#7f1d1d', border: '1.5px solid #ef4444', borderRadius: 9, padding: '10px 20px', fontSize: 13, fontWeight: 700, color: '#f87171', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {waConnecting ? 'Disconnecting...' : 'Disconnect WhatsApp'}
+                </button>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ ...lbl }}>Phone Number (Pairing Code ke liye)</label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input style={{ ...inp, flex: 1 }} placeholder="919876543210 (country code ke saath)" value={waPhone} onChange={e => setWaPhone(e.target.value)} />
+                      <button onClick={handleWAConnect} disabled={waConnecting || !waPhone.trim()}
+                        style={{ background: waConnecting || !waPhone.trim() ? '#334155' : '#25d366', border: 'none', borderRadius: 9, padding: '10px 16px', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                        {waConnecting ? '...' : 'Get Code'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {waPairingCode && (
+                    <div style={{ background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.25)', borderRadius: 10, padding: 16, textAlign: 'center', marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>Pairing Code — WhatsApp → Linked Devices mein daalo</div>
+                      <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '0.3em', color: '#25d366', fontFamily: 'monospace' }}>{waPairingCode}</div>
+                    </div>
+                  )}
+
+                  {waQr && (
+                    <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Ya QR scan karo</div>
+                      <img src={waQr} alt="QR" style={{ width: 180, height: 180, borderRadius: 10, background: 'white', padding: 8 }} />
+                    </div>
+                  )}
+
+                  {!waQr && !waPairingCode && !waConnecting && (
+                    <button onClick={handleWAGetQR}
+                      style={{ background: '#0f2d1f', border: '1.5px solid #25d366', borderRadius: 9, padding: '10px 20px', fontSize: 13, fontWeight: 700, color: '#25d366', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Generate QR Code
+                    </button>
+                  )}
+
+                  {waConnecting && <div style={{ color: '#64748b', fontSize: 13, padding: '10px 0' }}>Loading...</div>}
+                </>
+              )}
+
+              {waError && <div style={{ marginTop: 10, color: '#f87171', fontSize: 12 }}>⚠️ {waError}</div>}
+            </div>
 
             {/* Webhook URL */}
             <div style={{ background: '#1e293b', borderRadius: 14, padding: 20, border: '1px solid #334155', marginBottom: 16 }}>
