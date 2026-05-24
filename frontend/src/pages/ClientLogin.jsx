@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const clientApi = {
   login: async (username, password) => {
@@ -12,6 +13,7 @@ const clientApi = {
 };
 
 export default function ClientLogin({ onLogin }) {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -35,6 +37,7 @@ export default function ClientLogin({ onLogin }) {
         localStorage.setItem('clientToken', data.clientToken);
         localStorage.setItem('clientName', data.name || form.username);
         onLogin();
+        navigate('/client-portal');
       } else {
         setError(data.error || 'Login failed');
       }
