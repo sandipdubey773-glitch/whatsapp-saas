@@ -168,7 +168,7 @@ router.put('/clients/:id', (req, res) => {
     if (body.googleSheetWebhook !== undefined) updates.googleSheetWebhook = body.googleSheetWebhook;
     if (body.reportPhone !== undefined)        updates.reportPhone = body.reportPhone;
     if (body.clientUsername !== undefined)     updates.clientUsername = body.clientUsername;
-    if (body.clientPassword)                   updates.clientPassword = body.clientPassword;
+    if (body.clientPassword !== undefined)     updates.clientPassword = body.clientPassword;
     if (body.permissions !== undefined)          updates.permissions = body.permissions;
     if (body.greenApiInstanceId !== undefined)   updates.greenApiInstanceId = body.greenApiInstanceId;
     if (body.greenApiToken !== undefined)        updates.greenApiToken = body.greenApiToken;

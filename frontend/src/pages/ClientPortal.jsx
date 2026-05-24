@@ -827,9 +827,9 @@ export default function ClientPortal({ onLogout }) {
               <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>Ye URL Meta Dashboard → WhatsApp → Configuration → Webhook mein daalo</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <code style={{ flex: 1, background: '#0f172a', padding: '10px 12px', borderRadius: 8, fontSize: 12, color: '#60a5fa', border: '1px solid #334155', wordBreak: 'break-all' }}>
-                  {metaConfig.webhookUrl || 'https://shivangi-saas-bot.onrender.com/meta/webhook'}
+                  {metaConfig.webhookUrl || 'https://api.shivangiautoclinic.com/meta/webhook'}
                 </code>
-                <button onClick={() => { navigator.clipboard.writeText(metaConfig.webhookUrl || 'https://shivangi-saas-bot.onrender.com/meta/webhook'); setMsg('Webhook URL copy ho gaya!'); }}
+                <button onClick={() => { navigator.clipboard.writeText(metaConfig.webhookUrl || 'https://api.shivangiautoclinic.com/meta/webhook'); setMsg('Webhook URL copy ho gaya!'); }}
                   style={{ background: '#334155', border: 'none', borderRadius: 8, padding: '10px 14px', fontSize: 12, fontWeight: 700, color: '#94a3b8', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                   Copy
                 </button>
