@@ -18,6 +18,11 @@ export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs 
   const navigate = useNavigate();
   const [showPortal, setShowPortal] = useState(false);
   const [showWA, setShowWA] = useState(false);
+  const [showBroadcast, setShowBroadcast] = useState(false);
+  const [bcNumbers, setBcNumbers] = useState('');
+  const [bcMessage, setBcMessage] = useState('');
+  const [bcSending, setBcSending] = useState(false);
+  const [bcResult, setBcResult] = useState(null);
   const [waPhone, setWaPhone] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [pairingCode, setPairingCode] = useState('');
@@ -215,6 +220,10 @@ export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs 
               {reporting ? 'Sending...' : 'Report'}
             </button>
           )}
+          <button className="btn btn-secondary btn-sm" onClick={() => { setShowBroadcast(true); setBcResult(null); }}
+            style={{ color: '#f59e0b' }}>
+            📢 Broadcast
+          </button>
           <button className="btn btn-danger btn-sm" onClick={onDelete}>
             Delete
           </button>
@@ -284,6 +293,91 @@ export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowWA(false)}>Close</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Broadcast Modal */}
+      {showBroadcast && (
+        <div className="modal-overlay" onClick={() => setShowBroadcast(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <h3 className="modal__title">📢 Broadcast — {client.name}</h3>
+
+            {!bcResult ? (
+              <>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: 6 }}>
+                    Phone Numbers <span style={{ color: '#64748b' }}>(ek line mein ek number, country code ke saath)</span>
+                  </label>
+                  <textarea
+                    className="input"
+                    rows={6}
+                    value={bcNumbers}
+                    onChange={e => setBcNumbers(e.target.value)}
+                    placeholder={"919876543210\n918765432109\n917654321098"}
+                    style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 13 }}
+                  />
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                    {bcNumbers.split('\n').filter(n => n.trim().replace(/\D/g,'').length >= 10).length} valid numbers
+                  </div>
+                </div>
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: 6 }}>Message</label>
+                  <textarea
+                    className="input"
+                    rows={4}
+                    value={bcMessage}
+                    onChange={e => setBcMessage(e.target.value)}
+                    placeholder="Yahan apna message likho..."
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+                <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#f59e0b', marginBottom: 16 }}>
+                  ⚠️ Meta API use hoga — sirf un numbers pe kaam karega jinse 24 ghante mein baat hui ho, ya approved template ho.
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-primary" style={{ flex: 1, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                    disabled={bcSending || !bcMessage.trim() || !bcNumbers.trim()}
+                    onClick={async () => {
+                      const nums = bcNumbers.split('\n').map(n => n.trim().replace(/\D/g,'')).filter(n => n.length >= 10);
+                      if (!nums.length) return;
+                      setBcSending(true);
+                      try {
+                        const r = await api.bulkSend(client.id, nums, bcMessage.trim());
+                        setBcResult(r);
+                      } catch(e) { setBcResult({ error: e.message }); }
+                      setBcSending(false);
+                    }}>
+                    {bcSending ? 'Bhej raha...' : `📢 ${bcNumbers.split('\n').filter(n=>n.trim().replace(/\D/g,'').length>=10).length} numbers ko bhejo`}
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setShowBroadcast(false)}>Cancel</button>
+                </div>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                {bcResult.error ? (
+                  <div style={{ color: '#ef4444' }}>❌ Error: {bcResult.error}</div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 8 }}>Broadcast Complete!</div>
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 16 }}>
+                      <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10, padding: '10px 20px' }}>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: '#22c55e' }}>{bcResult.sent}</div>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>Sent</div>
+                      </div>
+                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, padding: '10px 20px' }}>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: '#ef4444' }}>{bcResult.failed}</div>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>Failed</div>
+                      </div>
+                    </div>
+                  </>
+                )}
+                <button className="btn btn-secondary" onClick={() => { setBcResult(null); setBcNumbers(''); setBcMessage(''); }}>
+                  Naya Broadcast
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

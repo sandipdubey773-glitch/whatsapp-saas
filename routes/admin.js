@@ -424,4 +424,35 @@ router.post('/clients/:id/conversations/:convId/resolve', (req, res) => {
   }
 });
 
+// POST /admin/clients/:id/bulk-send — broadcast message to multiple numbers
+router.post('/clients/:id/bulk-send', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { numbers, message } = req.body;
+    if (!numbers?.length || !message?.trim()) return res.status(400).json({ error: 'numbers aur message required' });
+
+    const client = db.get('clients').find({ id }).value();
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const results = { sent: 0, failed: 0, errors: [] };
+    for (const num of numbers) {
+      const clean = String(num).replace(/\D/g, '');
+      if (!clean || clean.length < 10) { results.failed++; continue; }
+      try {
+        await sendMessage(id, clean, message.trim());
+        results.sent++;
+      } catch (e) {
+        results.failed++;
+        results.errors.push({ number: clean, error: e.message });
+      }
+      await new Promise(r => setTimeout(r, 500)); // 500ms delay between messages
+    }
+    console.log(`[Admin] Bulk send done — sent: ${results.sent}, failed: ${results.failed}`);
+    res.json({ success: true, ...results });
+  } catch (err) {
+    console.error('[Admin] bulk-send:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

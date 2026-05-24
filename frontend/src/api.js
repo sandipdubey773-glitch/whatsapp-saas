@@ -34,6 +34,7 @@ export const api = {
   sendMessage:     (id, to, text)=> post(`${BASE}/admin/clients/${id}/send-message`, { to, text }, { headers: headers() }),
   toggleBot:       (id, convId)  => post(`${BASE}/admin/clients/${id}/conversations/${convId}/bot-toggle`, {}, { headers: headers() }),
   resolveConversation:(id, convId)=> post(`${BASE}/admin/clients/${id}/conversations/${convId}/resolve`, {}, { headers: headers() }),
+  bulkSend:        (id, numbers, message) => post(`${BASE}/admin/clients/${id}/bulk-send`, { numbers, message }, { headers: headers() }),
 };
 
 export const leadsApi = {
