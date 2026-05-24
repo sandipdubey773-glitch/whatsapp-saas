@@ -6,3 +6,4 @@ dist/
 backend/node_modules/
 frontend/node_modules/
 public/assets/
+VITE_API_URL=

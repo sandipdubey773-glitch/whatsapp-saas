@@ -8,9 +8,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: ADMIN_TOKEN
-        value: ShivangiSaaS@2026
+        sync: false
       - key: SUPABASE_URL
-        value: https://dmyfbklrahhjrbelumgi.supabase.co
+        sync: false
       - key: SUPABASE_KEY
         sync: false
       - key: GREEN_API_INSTANCE_ID
