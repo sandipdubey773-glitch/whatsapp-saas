@@ -16,7 +16,7 @@ router.post('/login', (req, res) => {
     if (!client) return res.status(401).json({ error: 'Wrong username ya password' });
 
     res.json({
-      token: client.clientToken,
+      clientToken: client.clientToken,
       name: client.name,
       permissions: client.permissions || {},
     });
