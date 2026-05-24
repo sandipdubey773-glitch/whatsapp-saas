@@ -192,16 +192,116 @@ export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs 
           <button className="btn btn-secondary btn-sm" onClick={() => onLogs(client.id)}>
             Logs
           </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowWA(true)}
+            style={{ color: waStatus === 'open' ? '#22d3ee' : '#f59e0b' }}>
+            {waStatus === 'open' ? '📱 WA' : '🔌 WA'}
+          </button>
           {client.reportPhone && (
             <button className="btn btn-secondary btn-sm" onClick={handleSendReport} disabled={reporting}>
               {reporting ? 'Sending...' : 'Report'}
             </button>
           )}
-          <button className="btn btn-secondary btn-sm" onClick={onDelete}>
+          <button className="btn btn-danger btn-sm" onClick={onDelete}>
             Delete
           </button>
         </div>
       </div>
+
+      {/* WhatsApp Connect Modal */}
+      {showWA && (
+        <div className="modal-overlay" onClick={() => setShowWA(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3 className="modal__title">WhatsApp — {client.name}</h3>
+
+            {waStatus === 'open' ? (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>✅</div>
+                <p style={{ color: '#22c55e', fontWeight: '600', marginBottom: '20px' }}>Connected</p>
+                <button className="btn btn-danger" onClick={handleDisconnect} disabled={waLoading}>
+                  {waLoading ? 'Disconnecting...' : 'Disconnect'}
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>
+                    Phone Number (with country code)
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      className="input"
+                      placeholder="919876543210"
+                      value={waPhone}
+                      onChange={e => setWaPhone(e.target.value)}
+                    />
+                    <button className="btn btn-primary" onClick={handleConnectWA} disabled={waLoading || !waPhone.trim()}>
+                      {waLoading ? '...' : 'Get Code'}
+                    </button>
+                  </div>
+                </div>
+
+                {pairingCode && (
+                  <div style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '10px', padding: '16px', textAlign: 'center', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '6px' }}>Pairing Code</div>
+                    <div style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '0.3em', color: '#818cf8' }}>{pairingCode}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '6px' }}>Enter this in WhatsApp → Linked Devices</div>
+                  </div>
+                )}
+
+                {qrCode && (
+                  <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '8px' }}>Or scan QR Code</div>
+                    <img src={qrCode} alt="QR" style={{ width: '200px', height: '200px', borderRadius: '10px', background: 'white', padding: '8px' }} />
+                  </div>
+                )}
+
+                {!qrCode && !pairingCode && !waLoading && (
+                  <button className="btn btn-secondary" style={{ width: '100%' }} onClick={handleGetQR}>
+                    Generate QR Code
+                  </button>
+                )}
+
+                {waLoading && <div style={{ textAlign: 'center', color: '#64748b', padding: '16px' }}>Loading...</div>}
+              </>
+            )}
+
+            {waError && <div style={{ marginTop: '12px', color: '#ef4444', fontSize: '0.8rem' }}>⚠️ {waError}</div>}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowWA(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Portal URL Modal */}
+      {showPortal && (
+        <div className="modal-overlay" onClick={() => setShowPortal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3 className="modal__title">Client Portal — {client.name}</h3>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '12px' }}>
+              Share this URL with your client to access their portal:
+            </p>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.85rem', color: '#818cf8', wordBreak: 'break-all', marginBottom: '16px' }}>
+              {portalUrl}
+            </div>
+            {client.token && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '6px' }}>Login Token:</div>
+                <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '10px 16px', fontFamily: 'monospace', fontSize: '0.85rem', color: '#f59e0b', wordBreak: 'break-all' }}>
+                  {client.token}
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary btn-sm" onClick={() => { navigator.clipboard?.writeText(portalUrl); }}>
+                Copy URL
+              </button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowPortal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
