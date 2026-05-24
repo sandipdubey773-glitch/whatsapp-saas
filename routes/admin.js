@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const db = require('../db');
-const { startClient, disconnectClient, getQRImage, getPairingCode, getStatus, setDB, getGroups, sendMessage, setPairingPhone } = require('../services/wa-sessions');
+const { startClient, disconnectClient, getQRImage, getPairingCode, getStatus, setDB, getGroups, sendMessage, setPairingPhone, bootClientSession } = require('../services/wa-sessions');
 const { sendReportToClient, generateReport } = require('../services/reporter');
 const greenApi = require('../services/green-api');
 
@@ -226,11 +226,12 @@ router.post('/clients/:id/toggle', (req, res) => {
     const client = db.get('clients').find({ id }).value();
     if (!client) return res.status(404).json({ error: 'Not found' });
     const newStatus = client.status === 'active' ? 'inactive' : 'active';
-    // Agar active kar rahe hain toh baaki sab clients inactive karo (single Baileys number)
-    if (newStatus === 'active') {
-      db.get('clients').each(c => { if (c.id !== id) c.status = 'inactive'; }).write();
-    }
     db.get('clients').find({ id }).assign({ status: newStatus }).write();
+    if (newStatus === 'active' && !client.metaPhoneNumberId) {
+      bootClientSession(id, db).catch(e => console.error('[Admin] bootClientSession error:', e.message));
+    } else if (newStatus === 'inactive') {
+      disconnectClient(id);
+    }
     console.log('[Admin] Toggled', id, '->', newStatus);
     res.json({ status: newStatus });
   } catch (err) {

@@ -6,28 +6,43 @@ const booking = require('./booking');
 const { useFirebaseAuthState } = require('./firebase-auth-state');
 const metaApi = require('./meta-api');
 
+const FB_BASE = 'https://shivangi-auto-clinic-99030-default-rtdb.firebaseio.com';
+
+// --- Per-client session state ---
+// sessions: Map<clientId, { sock, connected, qrData, pairingPhone, pairingCodeValue, reconnectAttempts, isBooting }>
+const sessions = new Map();
+
+function getSession(clientId) {
+  if (!sessions.has(clientId)) {
+    sessions.set(clientId, {
+      sock: null,
+      connected: false,
+      qrData: null,
+      pairingPhone: null,
+      pairingCodeValue: null,
+      reconnectAttempts: 0,
+      isBooting: false,
+    });
+  }
+  return sessions.get(clientId);
+}
+
+// --- Global shared state ---
 const lastReply = new Map();
-const conversationTimers = new Map(); // convId → timeoutId
-const leadCapturedConvs = new Set();  // convId of convs where lead was sent
-const lidPhoneMap = new Map();        // '@lid JID' → 'phone digits' (populated from contacts.upsert)
+const conversationTimers = new Map();
+const leadCapturedConvs = new Set();
+const lidPhoneMap = new Map();
 
 let _db = null;
-let sock = null;
-let qrData = null;
-let connected = false;
-let pairingPhone = null;
-let pairingCodeValue = null;
-let reconnectAttempts = 0;
-let isBooting = false;
 
 // --- Green API Notification Queue ---
-const notifQueues = new Map(); // clientId -> [{receiptId, ...}]
+const notifQueues = new Map();
 let receiptCounter = Date.now();
 
 function _pushNotif(clientId, payload) {
   if (!notifQueues.has(clientId)) notifQueues.set(clientId, []);
   const q = notifQueues.get(clientId);
-  if (q.length >= 100) q.shift(); // max 100
+  if (q.length >= 100) q.shift();
   q.push({ receiptId: ++receiptCounter, ...payload });
 }
 
@@ -49,30 +64,77 @@ function clearNotifications(clientId) {
 }
 
 function setDB(db) { _db = db; }
-function getStatus() { return connected ? 'open' : 'close'; }
-function getQRImage() { return qrData; }
-function getPairingCode() { return pairingCodeValue; }
-function disconnectClient() { if (sock) { try { sock.end(undefined); } catch(e){} sock = null; } }
-function getGroups() { return []; }
 
-function setPairingPhone(phone) {
-  pairingPhone = String(phone).replace(/\D/g, '');
-  pairingCodeValue = null;
+function getStatus(clientId) {
+  if (!clientId) {
+    for (const [, s] of sessions) { if (s.connected) return 'open'; }
+    return 'close';
+  }
+  return sessions.get(clientId)?.connected ? 'open' : 'close';
 }
 
-async function startClient(id, phone) {
-  setPairingPhone(phone);
-  destroySock();
-  connected = false;
-  qrData = null;
-  isBooting = false;
-  reconnectAttempts = 0;
+function getQRImage(clientId) {
+  if (!clientId) {
+    for (const [, s] of sessions) { if (s.qrData) return s.qrData; }
+    return null;
+  }
+  return sessions.get(clientId)?.qrData || null;
+}
+
+function getPairingCode(clientId) {
+  if (!clientId) {
+    for (const [, s] of sessions) { if (s.pairingCodeValue) return s.pairingCodeValue; }
+    return null;
+  }
+  return sessions.get(clientId)?.pairingCodeValue || null;
+}
+
+function disconnectClient(clientId) {
+  const s = sessions.get(clientId);
+  if (s?.sock) {
+    try { s.sock.end(undefined); } catch(e) {}
+    s.sock = null;
+    s.connected = false;
+  }
+}
+
+function getGroups() { return []; }
+
+function setPairingPhone(clientId, phone) {
+  const s = getSession(clientId);
+  s.pairingPhone = String(phone).replace(/\D/g, '');
+  s.pairingCodeValue = null;
+}
+
+// --- Cleanup old socket safely ---
+function destroySock(clientId) {
+  const s = sessions.get(clientId);
+  if (!s?.sock) return;
+  const old = s.sock;
+  s.sock = null;
+  try { old.ev.removeAllListeners(); } catch(_) {}
+  try { old.ws?.removeAllListeners(); } catch(_) {}
+  try { old.end(undefined); } catch(_) {}
+  try { old.ws?.close(); } catch(_) {}
+}
+
+async function startClient(clientId, phone) {
+  const s = getSession(clientId);
+  if (phone) {
+    s.pairingPhone = String(phone).replace(/\D/g, '');
+    s.pairingCodeValue = null;
+  }
+  destroySock(clientId);
+  s.connected = false;
+  s.qrData = null;
+  s.isBooting = false;
+  s.reconnectAttempts = 0;
   await new Promise(r => setTimeout(r, 1000));
-  bootSessions(_db);
+  bootClientSession(clientId, _db);
 }
 
 function toJID(phone) {
-  if (String(phone).includes('@')) return phone; // already a full JID (@lid, @s.whatsapp.net, etc.)
+  if (String(phone).includes('@')) return phone;
   const num = String(phone).replace(/\D/g, '');
   const withCode = num.length === 10 ? '91' + num : num;
   return withCode + '@s.whatsapp.net';
@@ -88,12 +150,13 @@ async function sendMessage(clientId, to, text) {
     await metaApi.sendMessage(client.metaPhoneNumberId, client.metaAccessToken, to, text);
     return;
   }
-  if (!sock || !connected) throw new Error('WhatsApp connected nahi hai — pehle connect karo');
+  const s = sessions.get(clientId);
+  if (!s?.sock || !s?.connected) throw new Error('WhatsApp connected nahi hai — pehle connect karo');
   try {
-    await sock.sendMessage(toJID(to), { text });
-    console.log('[WA] Sent to', to);
+    await s.sock.sendMessage(toJID(to), { text });
+    console.log(`[WA:${clientId}] Sent to`, to);
   } catch (err) {
-    console.error('[WA] sendMessage error:', err.message);
+    console.error(`[WA:${clientId}] sendMessage error:`, err.message);
     throw err;
   }
 }
@@ -104,12 +167,13 @@ async function sendToGroup(clientId, groupId, text) {
     console.warn('[Meta] Group messaging not supported via Meta API — skipping');
     return;
   }
-  if (!sock || !connected) { console.error('[WA] Not connected — cannot send to group'); return; }
+  const s = sessions.get(clientId);
+  if (!s?.sock || !s?.connected) { console.error(`[WA:${clientId}] Not connected — cannot send to group`); return; }
   try {
-    await sock.sendMessage(toGroupJID(groupId), { text });
-    console.log('[WA] Group sent to', groupId);
+    await s.sock.sendMessage(toGroupJID(groupId), { text });
+    console.log(`[WA:${clientId}] Group sent to`, groupId);
   } catch (err) {
-    console.error('[WA] sendToGroup error:', err.message);
+    console.error(`[WA:${clientId}] sendToGroup error:`, err.message);
   }
 }
 
@@ -188,8 +252,9 @@ REPLY RULES:
     messages.push({ role: 'user', content: userText, timestamp: new Date().toISOString() });
     if (messages.length > 20) messages = messages.slice(-20);
 
-    if (sock && connected) {
-      sock.sendPresenceUpdate('composing', toJID(senderPhone)).catch(() => {});
+    const sess = sessions.get(client.id);
+    if (sess?.sock && sess?.connected) {
+      sess.sock.sendPresenceUpdate('composing', toJID(senderPhone)).catch(() => {});
     }
 
     const aiReply = await callAI({
@@ -272,7 +337,6 @@ REPLY RULES:
       }
     }
 
-    // STOCK_IN marker
     const stockInMatches = [...aiReply.matchAll(/\[STOCK_IN:(\w+)\|([^|]+)\|(\d+)\|([^\]]+)\]/g)];
     for (const m of stockInMatches) {
       const [, loc, partName, qtyStr, staffName] = m;
@@ -291,7 +355,6 @@ REPLY RULES:
     }
     cleanReply = cleanReply.replace(/\[STOCK_IN:[^\]]+\]/g, '').trim();
 
-    // STOCK_OUT marker
     const stockOutMatches = [...aiReply.matchAll(/\[STOCK_OUT:(\w+)\|([^|]+)\|(\d+)\|([^\]]+)\]/g)];
     for (const m of stockOutMatches) {
       const [, loc, partName, qtyStr, staffName] = m;
@@ -338,7 +401,6 @@ async function handleMessage(client, senderPhone, userText) {
   try {
     const convId = `${client.id}_${senderPhone}`;
 
-    // Bot disabled for this conversation — skip AI, just store message
     const convCheck = _db.get('conversations').find({ id: convId }).value();
     if (convCheck?.botEnabled === false) {
       const messages = [...(convCheck.messages || []), { role: 'user', content: userText, timestamp: new Date().toISOString() }];
@@ -357,7 +419,6 @@ async function handleMessage(client, senderPhone, userText) {
       }
     }
 
-    // 5-minute auto-lead timer — reset on every message so it only fires after 5min of SILENCE
     if (!leadCapturedConvs.has(convId)) {
       if (conversationTimers.has(convId)) clearTimeout(conversationTimers.get(convId));
       const timer = setTimeout(() => autoSendLeadFromTimer(client, senderPhone, convId), 5 * 60 * 1000);
@@ -374,11 +435,9 @@ async function handleMessage(client, senderPhone, userText) {
       const [currH, currM] = new Intl.DateTimeFormat('en-US', options).format(new Date()).split(':').map(Number);
       const [startH, startM] = client.businessHoursStart.split(':').map(Number);
       const [endH, endM] = client.businessHoursEnd.split(':').map(Number);
-      
       const currentMins = currH * 60 + currM;
       const startMins = startH * 60 + startM;
       const endMins = endH * 60 + endM;
-      
       const isClosed = currentMins < startMins || currentMins >= endMins;
       if (isClosed) {
         const nowTs = Date.now();
@@ -399,14 +458,12 @@ async function handleMessage(client, senderPhone, userText) {
     const dateContext = `\n\n[SYSTEM: Aaj ki date hai ${todayStr}. "Kal" matlab ${tomorrowStr}. Date hamesha YYYY-MM-DD format mein likho.]`;
     const alreadyCaptured = messages.some(m => m.role === 'assistant' && m.content.includes('[LEAD_READY:'));
     const noLeadInstruction = alreadyCaptured ? '\n\n[SYSTEM: Lead pehle hi capture ho chuka hai — LEAD_READY marker DOBARA MAT LIKHO.]' : '';
-    
-    // Automatically pass the user's WhatsApp number so the bot doesn't ask for it
     const cleanCustomerPhone = senderPhone.replace(/\D/g, '');
     const phoneContext = `\n\n[SYSTEM: Is customer ka WhatsApp number ${cleanCustomerPhone} hai. Tumhe inse inka phone number NAHI poochna hai. Jab lead capture karo, toh 'mobile' field mein ${cleanCustomerPhone} hi likhna.]`;
 
-    // Show typing indicator while AI is processing
-    if (sock && connected) {
-      sock.sendPresenceUpdate('composing', toJID(senderPhone)).catch(() => {});
+    const sess = sessions.get(client.id);
+    if (sess?.sock && sess?.connected) {
+      sess.sock.sendPresenceUpdate('composing', toJID(senderPhone)).catch(() => {});
     }
 
     const aiReply = await callAI({
@@ -425,11 +482,11 @@ async function handleMessage(client, senderPhone, userText) {
     const cleanReply = aiReply.replace(/\[LEAD_READY:[^\]]+\]/g, '').trim();
 
     if (cleanReply) {
-      if (client.typingDelayEnabled && sock && connected) {
+      if (client.typingDelayEnabled && sess?.sock && sess?.connected) {
         try {
-          await sock.sendPresenceUpdate('composing', toJID(senderPhone));
+          await sess.sock.sendPresenceUpdate('composing', toJID(senderPhone));
           await new Promise(r => setTimeout(r, 2000));
-          await sock.sendPresenceUpdate('paused', toJID(senderPhone));
+          await sess.sock.sendPresenceUpdate('paused', toJID(senderPhone));
         } catch (e) { /* ignore */ }
       }
       await sendMessage(client.id, senderPhone, cleanReply);
@@ -438,7 +495,6 @@ async function handleMessage(client, senderPhone, userText) {
 
     if (leadMarker) {
       console.log('[WA] Lead captured:', leadMarker);
-      // Clear 5-min timer — lead captured properly
       leadCapturedConvs.add(convId);
       if (conversationTimers.has(convId)) {
         clearTimeout(conversationTimers.get(convId));
@@ -446,7 +502,6 @@ async function handleMessage(client, senderPhone, userText) {
       }
       booking.handleLead(client.id, { ...leadMarker, source: 'whatsapp' }, senderPhone)
         .then(result => {
-          // Back-populate lidPhoneMap when customer shares number in conversation
           const mobile = result?.lead?.mobile;
           if (mobile && String(senderPhone).includes('@lid')) {
             const digits = mobile.replace(/\D/g, '');
@@ -481,7 +536,6 @@ async function autoSendLeadFromTimer(client, senderPhone, convId) {
 
   console.log('[WA] 5-min timer fired for', senderPhone, '— auto-sending lead');
 
-  // If @lid, try to resolve phone from contacts map (may have populated in 5 mins)
   const isLidJid = String(senderPhone).includes('@lid');
   const resolvedPhone = (isLidJid && lidPhoneMap.has(senderPhone))
     ? lidPhoneMap.get(senderPhone)
@@ -503,7 +557,7 @@ async function autoSendLeadFromTimer(client, senderPhone, convId) {
   await sendMessage(client.id, senderPhone, msg).catch(() => {});
 }
 
-// --- Fire outgoing webhook to client's server ---
+// --- Fire outgoing webhook ---
 async function fireWebhook(client, senderPhone, text, msgId) {
   if (!client.webhookUrl) return;
   const payload = {
@@ -535,7 +589,6 @@ async function handleGroupStockMessage(client, msg, text, location) {
   const trimmed = text.trim();
   const upper = trimmed.toUpperCase();
 
-  // STOCK — show current stock for this location
   if (upper === 'STOCK' || upper === 'STOCK REPORT') {
     const stocks = _db.get('stock').filter({ clientId: client.id, location }).value();
     if (!stocks.length) {
@@ -543,11 +596,10 @@ async function handleGroupStockMessage(client, msg, text, location) {
       return;
     }
     const lines = stocks.map(s => `${s.qty > 0 ? '✅' : '🚨'} *${s.partName}* — ${s.qty} units`).join('\n');
-    await sendToGroup(client.id, groupJid, `📦 *${locationLabel} Stock — NJ YAMAHA*\n━━━━━━━━━━━━━━━\n${lines}`);
+    await sendToGroup(client.id, groupJid, `📦 *${locationLabel} Stock — ${client.name}*\n━━━━━━━━━━━━━━━\n${lines}`);
     return;
   }
 
-  // IN | Part | Qty | Staff
   const inMatch = trimmed.match(/^IN\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|\s*(.+)$/i);
   if (inMatch) {
     const partName = inMatch[1].trim();
@@ -567,7 +619,6 @@ async function handleGroupStockMessage(client, msg, text, location) {
     return;
   }
 
-  // OUT | Part | Qty | Staff
   const outMatch = trimmed.match(/^OUT\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|\s*(.+)$/i);
   if (outMatch) {
     const partName = outMatch[1].trim();
@@ -593,7 +644,6 @@ async function handleGroupStockMessage(client, msg, text, location) {
     return;
   }
 
-  // Wrong format
   await sendToGroup(client.id, groupJid,
     `❌ Sahi format mein likhein:\n\n` +
     `➕ *IN | Part Name | Qty | Staff Name*\n` +
@@ -614,24 +664,23 @@ function fireStockSheet(client, data) {
     .catch(e => console.warn('[Sheet] Stock error:', e.message));
 }
 
-// --- Incoming message handler (Baileys event) ---
-async function handleIncoming(msg) {
+// --- Incoming message handler — clientId bound at socket creation ---
+async function handleIncoming(msg, clientId) {
   if (!_db) return;
   const jid = msg.key.remoteJid;
   if (!jid) return;
   if (jid === 'status@broadcast') return;
 
-  // Group message — only process if it's a known stock group
+  // Group message
   if (jid.endsWith('@g.us')) {
     const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
     if (!text.trim()) return;
-    const clients = _db.get('clients').filter({ status: 'active' }).value();
-    let matchClient = null, location = null;
-    for (const c of clients) {
-      if (c.workshopGroup && toGroupJID(c.workshopGroup) === jid) { matchClient = c; location = 'workshop'; break; }
-      if (c.showroomGroup && toGroupJID(c.showroomGroup) === jid) { matchClient = c; location = 'showroom'; break; }
-    }
-    if (matchClient) await handleGroupStockMessage(matchClient, msg, text, location);
+    const client = _db.get('clients').find({ id: clientId }).value();
+    if (!client) return;
+    let location = null;
+    if (client.workshopGroup && toGroupJID(client.workshopGroup) === jid) location = 'workshop';
+    else if (client.showroomGroup && toGroupJID(client.showroomGroup) === jid) location = 'showroom';
+    if (location) await handleGroupStockMessage(client, msg, text, location);
     return;
   }
 
@@ -640,20 +689,17 @@ async function handleIncoming(msg) {
                msg.message?.imageMessage?.caption || '';
   if (!text.trim()) return;
 
-  // Extract phone directly from remoteJid (919XXXXXXXXX@s.whatsapp.net format)
-  // Contacts events use @lid (not phone) — don't rely on them for number resolution
   let senderPhone = jid.replace('@s.whatsapp.net', '').replace('@c.us', '').replace('@lid', '');
   if (jid.endsWith('@s.whatsapp.net')) {
-    console.log('[WA] Phone from remoteJid:', senderPhone);
+    console.log(`[WA:${clientId}] Phone from remoteJid:`, senderPhone);
   } else if (jid.endsWith('@lid')) {
-    // @lid contact — phone unknown until customer shares it in conversation
-    senderPhone = jid; // use full @lid as unique key for conversation tracking
-    console.log('[WA] @lid contact, phone unknown:', jid);
+    senderPhone = jid;
+    console.log(`[WA:${clientId}] @lid contact:`, jid);
   }
 
-  const clients = _db.get('clients').filter({ status: 'active' }).value();
-  const client = clients[0];
-  if (!client) { console.warn('[WA] No active client found'); return; }
+  const client = _db.get('clients').find({ id: clientId }).value();
+  if (!client) { console.warn(`[WA:${clientId}] Client not found`); return; }
+  if (client.status !== 'active') return;
 
   const autoPatterns = [
     /did you mean one of these/i, /click pay now/i,
@@ -662,24 +708,22 @@ async function handleIncoming(msg) {
   ];
   if (autoPatterns.some(p => p.test(text))) return;
 
-  const convKey = `${client.id}_${senderPhone}`;
+  const convKey = `${clientId}_${senderPhone}`;
   const now = Date.now();
   if (now - (lastReply.get(convKey) || 0) < 5000) return;
   lastReply.set(convKey, now);
 
-  console.log('[WA] Incoming from', senderPhone, ':', text.slice(0, 80));
+  console.log(`[WA:${clientId}] Incoming from`, senderPhone, ':', text.slice(0, 80));
 
-  // Push to Green API notification queue
-  _pushNotif(client.id, {
+  _pushNotif(clientId, {
     typeWebhook: 'incomingMessageReceived',
-    instanceData: { idInstance: client.id, wid: senderPhone + '@c.us', typeInstance: 'whatsapp' },
+    instanceData: { idInstance: clientId, wid: senderPhone + '@c.us', typeInstance: 'whatsapp' },
     timestamp: Math.floor(Date.now() / 1000),
     idMessage: msg.key.id || `${Date.now()}`,
     senderData: { chatId: senderPhone + '@c.us', sender: senderPhone + '@c.us', senderName: '' },
     messageData: { typeMessage: 'textMessage', textMessageData: { textMessage: text } },
   });
 
-  // Fire outgoing webhook if client has one configured
   fireWebhook(client, senderPhone, text, msg.key.id).catch(() => {});
 
   const ownerList = (client.ownerPhone || '').split(',').map(p => p.trim().replace(/\D/g, '')).filter(Boolean);
@@ -687,51 +731,43 @@ async function handleIncoming(msg) {
   const isOwner = ownerList.some(op => cleanPhone.endsWith(op) || cleanPhone === op);
 
   if (isOwner) {
-    console.log('[WA] Owner message — trainer AI:', text.slice(0, 40));
+    console.log(`[WA:${clientId}] Owner message — trainer AI:`, text.slice(0, 40));
     await handleOwnerChat(client, senderPhone, text);
   } else {
     await handleMessage(client, senderPhone, text);
   }
 }
 
-// --- Cleanup old socket safely ---
-function destroySock() {
-  if (!sock) return;
-  const old = sock;
-  sock = null;
-  try { old.ev.removeAllListeners(); } catch(_) {}
-  try { old.ws?.removeAllListeners(); } catch(_) {}
-  try { old.end(undefined); } catch(_) {}
-  try { old.ws?.close(); } catch(_) {}
-}
+// --- Boot a single client's Baileys session ---
+async function bootClientSession(clientId, db) {
+  if (!db && !_db) { console.error('[WA] bootClientSession: no db'); return; }
+  const useDb = db || _db;
+  if (db) setDB(db);
 
-// --- Boot Baileys ---
-async function bootSessions(db) {
-  if (isBooting) return;
-  isBooting = true;
-  setDB(db);
+  const s = getSession(clientId);
+  if (s.isBooting) return;
+  s.isBooting = true;
 
-  // Kill old socket first — prevent event listener conflicts
-  destroySock();
+  destroySock(clientId);
   await new Promise(r => setTimeout(r, 500));
 
   let state, saveCreds;
   try {
-    ({ state, saveCreds } = await useFirebaseAuthState());
+    ({ state, saveCreds } = await useFirebaseAuthState(clientId));
   } catch(e) {
-    console.error('[WA] Firebase auth state error:', e.message);
-    isBooting = false;
-    setTimeout(() => bootSessions(db), 8000);
+    console.error(`[WA:${clientId}] Firebase auth state error:`, e.message);
+    s.isBooting = false;
+    setTimeout(() => bootClientSession(clientId, null), 8000);
     return;
   }
 
   let version;
   try {
     ({ version } = await fetchLatestBaileysVersion());
-    console.log('[WA] WhatsApp version:', version.join('.'));
+    console.log(`[WA:${clientId}] WhatsApp version:`, version.join('.'));
   } catch(e) {
     version = [2, 3000, 1035194821];
-    console.warn('[WA] Version fetch failed, using fallback');
+    console.warn(`[WA:${clientId}] Version fetch failed, using fallback`);
   }
 
   let currentSock;
@@ -753,94 +789,100 @@ async function bootSessions(db) {
       getMessage: async () => ({ conversation: '' }),
     });
   } catch(e) {
-    console.error('[WA] makeWASocket error:', e.message);
-    isBooting = false;
-    setTimeout(() => bootSessions(db), 8000);
+    console.error(`[WA:${clientId}] makeWASocket error:`, e.message);
+    s.isBooting = false;
+    setTimeout(() => bootClientSession(clientId, null), 8000);
     return;
   }
 
-  sock = currentSock;
+  s.sock = currentSock;
 
-  sock.ev.on('creds.update', saveCreds);
+  currentSock.ev.on('creds.update', saveCreds);
 
-  // contacts events use @lid IDs (not phone numbers) — no reliable phone resolution possible
-  // Phone numbers come directly from msg.key.remoteJid (@s.whatsapp.net format)
-
-  sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-    // Stale event from old socket — ignore
-    if (sock !== currentSock) return;
+  currentSock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+    if (s.sock !== currentSock) return; // stale event from old socket
 
     if (qr) {
-      if (pairingPhone) {
+      if (s.pairingPhone) {
         try {
-          pairingCodeValue = await currentSock.requestPairingCode(pairingPhone);
-          console.log('[WA] Pairing code generated:', pairingCodeValue);
+          s.pairingCodeValue = await currentSock.requestPairingCode(s.pairingPhone);
+          console.log(`[WA:${clientId}] Pairing code generated:`, s.pairingCodeValue);
         } catch(e) {
-          console.error('[WA] Pairing code error:', e.message);
-          qrData = qr;
+          console.error(`[WA:${clientId}] Pairing code error:`, e.message);
+          s.qrData = qr;
         }
       } else {
-        qrData = qr;
-        console.log('[WA] QR ready — visit /qr to scan');
-        require('qrcode-terminal').generate(qr, { small: true });
+        s.qrData = qr;
+        console.log(`[WA:${clientId}] QR ready`);
+        try { require('qrcode-terminal').generate(qr, { small: true }); } catch(_) {}
       }
     }
 
     if (connection === 'open') {
-      connected = true;
-      qrData = null;
-      pairingPhone = null;
-      pairingCodeValue = null;
-      reconnectAttempts = 0;
-      isBooting = false;
-      console.log('[WA] ✅ Connected!');
-      if (_db) _db.get('clients').filter({ status: 'active' }).each(c => { c.waStatus = 'open'; }).write();
+      s.connected = true;
+      s.qrData = null;
+      s.pairingPhone = null;
+      s.pairingCodeValue = null;
+      s.reconnectAttempts = 0;
+      s.isBooting = false;
+      console.log(`[WA:${clientId}] ✅ Connected!`);
+      if (_db) _db.get('clients').find({ id: clientId }).assign({ waStatus: 'open' }).write();
     }
 
     if (connection === 'close') {
-      connected = false;
-      qrData = null;
-      if (_db) _db.get('clients').filter({ status: 'active' }).each(c => { c.waStatus = 'close'; }).write();
+      s.connected = false;
+      s.qrData = null;
+      if (_db) _db.get('clients').find({ id: clientId }).assign({ waStatus: 'close' }).write();
       const code = lastDisconnect?.error?.output?.statusCode;
       const reason = lastDisconnect?.error?.message || 'unknown';
-      console.log('[WA] Disconnected — code:', code, '| reason:', reason);
+      console.log(`[WA:${clientId}] Disconnected — code:`, code, '| reason:', reason);
 
-      // Keep isBooting=true during delay so nothing else sneaks in
       const shouldClearSession =
         code === DisconnectReason.loggedOut ||
         code === DisconnectReason.badSession ||
         code === DisconnectReason.forbidden;
 
       if (shouldClearSession) {
-        console.log('[WA] Clearing session (code', code, ') — new QR needed');
-        axios.delete('https://shivangi-auto-clinic-99030-default-rtdb.firebaseio.com/wa-session.json', { timeout: 10000 }).catch(() => {});
-        reconnectAttempts = 0;
-        isBooting = false;
-        setTimeout(() => bootSessions(db), 3000);
+        console.log(`[WA:${clientId}] Clearing session (code`, code, ') — new QR needed');
+        axios.delete(`${FB_BASE}/wa-session-${clientId}.json`, { timeout: 10000 }).catch(() => {});
+        s.reconnectAttempts = 0;
+        s.isBooting = false;
+        setTimeout(() => bootClientSession(clientId, null), 3000);
       } else if (code === DisconnectReason.restartRequired) {
-        // 515: WhatsApp says restart — wait 5s for WA servers to be ready
-        console.log('[WA] Restart required (515) — reconnecting in 5s with saved session');
-        isBooting = false;
-        setTimeout(() => bootSessions(db), 5000);
+        console.log(`[WA:${clientId}] Restart required (515) — reconnecting in 5s`);
+        s.isBooting = false;
+        setTimeout(() => bootClientSession(clientId, null), 5000);
       } else {
-        reconnectAttempts++;
-        const delay = Math.min(reconnectAttempts * 5000, 30000);
-        console.log('[WA] Reconnecting in', delay / 1000, 's (attempt', reconnectAttempts, ')');
-        isBooting = false;
-        setTimeout(() => bootSessions(db), delay);
+        s.reconnectAttempts++;
+        const delay = Math.min(s.reconnectAttempts * 5000, 30000);
+        console.log(`[WA:${clientId}] Reconnecting in`, delay / 1000, 's (attempt', s.reconnectAttempts, ')');
+        s.isBooting = false;
+        setTimeout(() => bootClientSession(clientId, null), delay);
       }
     }
   });
 
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+  currentSock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
     for (const msg of messages) {
       if (msg.key.fromMe) continue;
-      try { await handleIncoming(msg); } catch (e) { console.error('[WA] handleIncoming error:', e.message); }
+      try { await handleIncoming(msg, clientId); } catch (e) { console.error(`[WA:${clientId}] handleIncoming error:`, e.message); }
     }
   });
 
-  console.log('[WA] Baileys starting...');
+  console.log(`[WA:${clientId}] Baileys starting...`);
+}
+
+// --- Boot all active Baileys clients on startup ---
+async function bootSessions(db) {
+  setDB(db);
+  const clients = db.get('clients').filter({ status: 'active' }).value();
+  // Only boot sessions for clients not using Meta API
+  const baileyClients = clients.filter(c => !c.metaPhoneNumberId);
+  console.log('[WA] bootSessions — booting', baileyClients.length, 'Baileys session(s)');
+  for (const client of baileyClients) {
+    bootClientSession(client.id, db).catch(e => console.error('[WA] Boot error:', client.id, e.message));
+  }
 }
 
 // --- Meta Business API incoming message handler ---
@@ -866,32 +908,31 @@ async function handleIncomingMeta(client, senderPhone, text) {
   }
 }
 
-// Legacy stub — no longer used (kept for route compatibility)
 async function processIncoming(webhookBody) {}
 
 // --- Reboot: reconnect without clearing session ---
-async function rebootClient() {
-  console.log('[WA] Reboot requested');
-  destroySock();
-  connected = false;
-  qrData = null;
-  isBooting = false;
-  reconnectAttempts = 0;
-  setTimeout(() => bootSessions(_db), 2000);
+async function rebootClient(clientId) {
+  console.log(`[WA:${clientId}] Reboot requested`);
+  const s = getSession(clientId);
+  destroySock(clientId);
+  s.connected = false;
+  s.qrData = null;
+  s.isBooting = false;
+  s.reconnectAttempts = 0;
+  setTimeout(() => bootClientSession(clientId, null), 2000);
 }
 
 // --- Logout: clear session and get new QR ---
-async function logoutClient() {
-  console.log('[WA] Logout requested — clearing session');
-  destroySock();
-  connected = false;
-  qrData = null;
-  isBooting = false;
-  reconnectAttempts = 0;
-  // Clear Firebase session so fresh QR is generated
-  const axios = require('axios');
-  axios.delete('https://shivangi-auto-clinic-99030-default-rtdb.firebaseio.com/wa-session.json', { timeout: 10000 }).catch(() => {});
-  setTimeout(() => bootSessions(_db), 2000);
+async function logoutClient(clientId) {
+  console.log(`[WA:${clientId}] Logout requested — clearing session`);
+  const s = getSession(clientId);
+  destroySock(clientId);
+  s.connected = false;
+  s.qrData = null;
+  s.isBooting = false;
+  s.reconnectAttempts = 0;
+  axios.delete(`${FB_BASE}/wa-session-${clientId}.json`, { timeout: 10000 }).catch(() => {});
+  setTimeout(() => bootClientSession(clientId, null), 2000);
 }
 
 function getLidPhoneMap() { return lidPhoneMap; }
@@ -899,7 +940,7 @@ function getLidPhoneMap() { return lidPhoneMap; }
 module.exports = {
   startClient, disconnectClient, rebootClient, logoutClient,
   getQRImage, getPairingCode, getStatus,
-  setDB, getGroups, sendMessage, sendToGroup, bootSessions, setPairingPhone,
+  setDB, getGroups, sendMessage, sendToGroup, bootSessions, bootClientSession, setPairingPhone,
   receiveNotification, deleteNotification, clearNotifications,
   processIncoming, handleIncomingMeta, getLidPhoneMap,
 };

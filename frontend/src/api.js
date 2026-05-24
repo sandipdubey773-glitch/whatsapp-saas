@@ -16,7 +16,7 @@ const put  = (url, d, cfg) => axios.put(url, d, cfg).then(r => r.data);
 const del  = (url, cfg) => axios.delete(url, cfg).then(r => r.data);
 
 export const api = {
-  getClients:      ()            => get(`${BASE}/admin/clients`,                              { headers: headers() }),
+  getClients:      ()            => get(`${BASE}/admin/clients`,                              { headers: headers() }).then(d => d.clients || d),
   addClient:       (data)        => post(`${BASE}/admin/clients`, data,                       { headers: headers() }),
   updateClient:    (id, d)       => put(`${BASE}/admin/clients/${id}`, d,                    { headers: headers() }),
   deleteClient:    (id)          => del(`${BASE}/admin/clients/${id}`,                        { headers: headers() }),
@@ -30,7 +30,7 @@ export const api = {
   getApiCreds:     (id)          => get(`${BASE}/admin/clients/${id}/api-credentials`,       { headers: headers() }),
   regenApiKey:     (id)          => post(`${BASE}/admin/clients/${id}/regen-apikey`, {},      { headers: headers() }),
   updateWebhook:   (id, url)     => put(`${BASE}/admin/clients/${id}`, { webhookUrl: url },  { headers: headers() }),
-  getConversations:(id)          => get(`${BASE}/admin/clients/${id}/logs`,                   { headers: headers() }),
+  getConversations:(id)          => get(`${BASE}/admin/clients/${id}/logs`,                   { headers: headers() }).then(d => d.logs || d.conversations || d),
   sendMessage:     (id, to, text)=> post(`${BASE}/admin/clients/${id}/send-message`, { to, text }, { headers: headers() }),
   toggleBot:       (id, convId)  => post(`${BASE}/admin/clients/${id}/conversations/${convId}/bot-toggle`, {}, { headers: headers() }),
   resolveConversation:(id, convId)=> post(`${BASE}/admin/clients/${id}/conversations/${convId}/resolve`, {}, { headers: headers() }),

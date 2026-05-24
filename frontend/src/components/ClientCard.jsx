@@ -90,7 +90,7 @@ export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs 
     setReporting(false);
   };
 
-  const portalUrl = `${import.meta.env.VITE_API_URL || ''}/client-portal`;
+  const portalUrl = `${window.location.origin}/app/client-login`;
 
   return (
     <>
@@ -183,6 +183,9 @@ export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs 
 
         {/* Info Row */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate('/edit-client/' + client.id)}>
+            Edit
+          </button>
           <button className="btn btn-secondary btn-sm" onClick={() => setShowPortal(true)}>
             Portal
           </button>
@@ -279,23 +282,39 @@ export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs 
         <div className="modal-overlay" onClick={() => setShowPortal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3 className="modal__title">Client Portal — {client.name}</h3>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '12px' }}>
-              Share this URL with your client to access their portal:
-            </p>
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.85rem', color: '#818cf8', wordBreak: 'break-all', marginBottom: '16px' }}>
+
+            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '6px' }}>Login URL</div>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '10px 16px', fontFamily: 'monospace', fontSize: '0.8rem', color: '#818cf8', wordBreak: 'break-all', marginBottom: '12px' }}>
               {portalUrl}
             </div>
-            {client.token && (
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '6px' }}>Login Token:</div>
-                <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '10px 16px', fontFamily: 'monospace', fontSize: '0.85rem', color: '#f59e0b', wordBreak: 'break-all' }}>
-                  {client.token}
+
+            {client.clientUsername && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Username</div>
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '8px 12px', fontFamily: 'monospace', fontSize: '0.85rem', color: '#f1f5f9' }}>
+                    {client.clientUsername}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Password</div>
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '8px 12px', fontFamily: 'monospace', fontSize: '0.85rem', color: '#f1f5f9' }}>
+                    {client.clientPassword}
+                  </div>
                 </div>
               </div>
             )}
+
+            <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', padding: '10px 14px', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '16px' }}>
+              Yeh details client ko bhejo — woh apne phone/PC pe login karke demo le sakte hain.
+            </div>
+
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button className="btn btn-primary btn-sm" onClick={() => { navigator.clipboard?.writeText(portalUrl); }}>
-                Copy URL
+              <button className="btn btn-primary btn-sm" onClick={() => {
+                const text = `WhatsApp Bot Portal\nURL: ${portalUrl}\nUsername: ${client.clientUsername || ''}\nPassword: ${client.clientPassword || ''}`;
+                navigator.clipboard?.writeText(text);
+              }}>
+                Copy All
               </button>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowPortal(false)}>Close</button>
             </div>

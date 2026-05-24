@@ -1,12 +1,8 @@
 const axios = require('axios');
 const { initAuthCreds, BufferJSON, proto } = require('@whiskeysockets/baileys');
 
-const FB_URL = 'https://shivangi-auto-clinic-99030-default-rtdb.firebaseio.com/wa-session';
+const FB_BASE = 'https://shivangi-auto-clinic-99030-default-rtdb.firebaseio.com';
 
-let saveTimer = null;
-let pendingKeyStore = null;
-
-// Firebase Realtime Database forbids . # $ [ ] / in keys
 function sanitizeKey(k) {
   return k
     .replace(/\./g, '_dot_')
@@ -29,30 +25,17 @@ function desanitizeKey(k) {
     .replace(/_dot_/g, '.');
 }
 
-async function fbGet() {
+async function useFirebaseAuthState(clientId) {
+  const FB_URL = `${FB_BASE}/wa-session-${clientId}`;
+  let saveTimer = null;
+
+  let stored = null;
   try {
     const res = await axios.get(FB_URL + '.json', { timeout: 15000 });
-    return res.data || null;
+    stored = res.data || null;
   } catch (e) {
-    console.warn('[FB-Auth] Read error:', e.message);
-    return null;
+    console.warn(`[FB-Auth:${clientId}] Read error:`, e.message);
   }
-}
-
-async function fbSet(data) {
-  try {
-    const payload = JSON.stringify(data);
-    console.log('[FB-Auth] Saving to Firebase —', Math.round(payload.length / 1024), 'KB');
-    await axios.put(FB_URL + '.json', data, { timeout: 15000 });
-    console.log('[FB-Auth] Session saved to Firebase');
-  } catch (e) {
-    console.error('[FB-Auth] Write error:', e.message);
-    if (e.response) console.error('[FB-Auth] Firebase said:', e.response.status, JSON.stringify(e.response.data).slice(0, 300));
-  }
-}
-
-async function useFirebaseAuthState() {
-  const stored = await fbGet();
 
   let creds;
   let keyStore = {};
@@ -60,41 +43,46 @@ async function useFirebaseAuthState() {
   if (stored && stored.creds) {
     try {
       creds = JSON.parse(stored.creds, BufferJSON.reviver);
-      // Desanitize keys that were sanitized before saving
       const rawKeys = stored.keys || {};
       for (const [k, v] of Object.entries(rawKeys)) {
         keyStore[desanitizeKey(k)] = v;
       }
-      console.log('[FB-Auth] Session loaded from Firebase');
+      console.log(`[FB-Auth:${clientId}] Session loaded from Firebase`);
     } catch (e) {
-      console.warn('[FB-Auth] Parse error, fresh session:', e.message);
+      console.warn(`[FB-Auth:${clientId}] Parse error, fresh session:`, e.message);
       creds = initAuthCreds();
     }
   } else {
-    console.log('[FB-Auth] No saved session — fresh start');
+    console.log(`[FB-Auth:${clientId}] No saved session — fresh start`);
     creds = initAuthCreds();
   }
 
   async function saveAll() {
-    // Sanitize keys for Firebase (no . # $ [ ] / @ allowed in keys)
-    // Skip session-* keys — large, one per contact, re-established on reconnect
     const slimKeys = {};
     for (const [k, v] of Object.entries(keyStore)) {
       if (!k.startsWith('session-')) slimKeys[sanitizeKey(k)] = v;
     }
-    await fbSet({
+    const data = {
       creds: JSON.stringify(creds, BufferJSON.replacer),
       keys: slimKeys,
       savedAt: new Date().toISOString(),
-    });
+    };
+    try {
+      const payload = JSON.stringify(data);
+      console.log(`[FB-Auth:${clientId}] Saving —`, Math.round(payload.length / 1024), 'KB');
+      await axios.put(FB_URL + '.json', data, { timeout: 15000 });
+      console.log(`[FB-Auth:${clientId}] Session saved`);
+    } catch (e) {
+      console.error(`[FB-Auth:${clientId}] Write error:`, e.message);
+      if (e.response) console.error(`[FB-Auth:${clientId}] Firebase said:`, e.response.status, JSON.stringify(e.response.data).slice(0, 300));
+    }
   }
 
-  // Debounced save for key updates (keys.set fires very frequently)
   function debouncedSave() {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
-      saveAll().catch(e => console.error('[FB-Auth] Debounced save error:', e.message));
+      saveAll().catch(e => console.error(`[FB-Auth:${clientId}] Debounced save error:`, e.message));
     }, 2000);
   }
 
