@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Caller — Shivangi Auto Clinic</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;padding-bottom:40px}
+
+/* ── Header ── */
+.header{background:#1e293b;border-bottom:1px solid #334155;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header-left{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;background:#25d366;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.title{font-size:16px;font-weight:800;color:#e2e8f0}
+.subtitle{font-size:11px;color:#64748b;margin-top:1px}
+.refresh-btn{background:#334155;border:none;color:#94a3b8;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+.refresh-btn:active{background:#475569}
+
+/* ── Date bar ── */
+.date-bar{padding:12px 16px;display:flex;align-items:center;gap:8px;background:#1e293b;border-bottom:1px solid #334155}
+.date-btn{background:#334155;border:none;color:#94a3b8;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.date-btn:active{background:#475569}
+.date-display{flex:1;text-align:center;font-size:14px;font-weight:700;color:#e2e8f0;cursor:pointer}
+.date-display span{font-size:11px;color:#64748b;display:block;font-weight:400}
+input[type=date].date-picker{position:absolute;opacity:0;pointer-events:none;width:0;height:0}
+
+/* ── Stats strip ── */
+.stats{display:flex;gap:1px;background:#334155;border-bottom:1px solid #334155}
+.stat{flex:1;background:#1e293b;padding:10px 8px;text-align:center}
+.stat-num{font-size:20px;font-weight:800;color:#e2e8f0}
+.stat-num.green{color:#4ade80}
+.stat-num.yellow{color:#fbbf24}
+.stat-num.red{color:#f87171}
+.stat-label{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+
+/* ── Filter tabs ── */
+.filter-bar{padding:10px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.filter-bar::-webkit-scrollbar{display:none}
+.ftab{background:#1e293b;border:1.5px solid #334155;color:#64748b;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s}
+.ftab.active{background:#0f3460;border-color:#3b82f6;color:#93c5fd}
+.ftab.active.green{background:#052e16;border-color:#22c55e;color:#4ade80}
+.ftab.active.yellow{background:#451a03;border-color:#f59e0b;color:#fbbf24}
+.ftab.active.red{background:#450a0a;border-color:#ef4444;color:#fca5a5}
+
+/* ── Lead cards ── */
+.list{padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+
+.card{background:#1e293b;border:1.5px solid #334155;border-radius:14px;overflow:hidden;transition:border-color .15s}
+.card.called{border-color:#166534;background:#0a1f14}
+.card.has-feedback{border-color:#1d4ed8}
+
+.card-top{padding:14px 14px 10px}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.lead-num{background:#334155;color:#94a3b8;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px}
+.lead-num.new{background:#0f3460;color:#93c5fd;border:1px solid #1d4ed8}
+.badges{display:flex;gap:4px}
+.badge{font-size:10px;font-weight:700;padding:3px 7px;border-radius:5px}
+.badge.called{background:#052e16;color:#4ade80;border:1px solid #166534}
+.badge.feedback{background:#0c1a4a;color:#93c5fd;border:1px solid #1d4ed8}
+.badge.new{background:#0f3460;color:#93c5fd;border:1px solid #1d4ed8}
+
+.customer-name{font-size:17px;font-weight:800;color:#e2e8f0;margin-bottom:6px}
+.info-row{display:flex;flex-wrap:wrap;gap:6px 14px}
+.info-item{font-size:12px;color:#94a3b8;display:flex;align-items:center;gap:4px}
+.info-item .icon{font-size:13px}
+.phone-num{font-size:14px;font-weight:700;color:#38bdf8;margin-top:6px;letter-spacing:.3px}
+.phone-num.no-num{color:#475569;font-size:12px;font-weight:400}
+
+/* ── Action buttons ── */
+.card-actions{display:flex;gap:8px;padding:0 14px 14px}
+.call-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:#14532d;color:#4ade80;border:2px solid #166534;border-radius:10px;font-size:15px;font-weight:800;text-decoration:none;cursor:pointer;transition:all .15s}
+.call-btn:active{background:#166534}
+.call-btn.no-num{background:#1e293b;color:#475569;border-color:#334155;pointer-events:none}
+.call-btn.called{background:#0a1f14;color:#4ade80;border-color:#166534}
+.fb-btn{background:#1e293b;border:1.5px solid #334155;color:#94a3b8;padding:13px 14px;border-radius:10px;font-size:18px;cursor:pointer;transition:all .15s}
+.fb-btn:active{background:#334155}
+.fb-btn.has{border-color:#1d4ed8;color:#60a5fa}
+
+/* ── Feedback drawer ── */
+.fb-drawer{display:none;padding:0 14px 14px}
+.fb-drawer.open{display:block}
+.existing-fb{background:#0c1a4a;border:1px solid #1d4ed8;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px;color:#93c5fd;line-height:1.5}
+.fb-textarea{width:100%;background:#0f172a;border:1.5px solid #334155;border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:14px;resize:none;height:72px;outline:none;font-family:inherit}
+.fb-textarea:focus{border-color:#3b82f6}
+.fb-save{width:100%;margin-top:8px;padding:10px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s}
+.fb-save:active{background:#1e40af}
+.fb-save:disabled{background:#334155;color:#64748b;cursor:not-allowed}
+
+/* ── Empty / Loading states ── */
+.empty{text-align:center;padding:60px 20px;color:#475569}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty-title{font-size:16px;font-weight:700;color:#64748b;margin-bottom:6px}
+.empty-sub{font-size:13px}
+.loading{text-align:center;padding:60px 20px;color:#475569}
+.spinner{width:36px;height:36px;border:3px solid #334155;border-top-color:#25d366;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">📞</div>
+    <div>
+      <div class="title">Caller</div>
+      <div class="subtitle">Shivangi Auto Clinic</div>
+    </div>
+  </div>
+  <button class="refresh-btn" onclick="loadLeads()">↻ Refresh</button>
+</div>
+
+<!-- Date bar -->
+<div class="date-bar">
+  <button class="date-btn" onclick="changeDate(-1)">‹</button>
+  <div class="date-display" onclick="openDatePicker()">
+    <span id="dateLabel">Loading...</span>
+    <span id="dateSub"></span>
+  </div>
+  <button class="date-btn" onclick="changeDate(1)">›</button>
+  <input type="date" id="datePicker" class="date-picker" onchange="onDatePick()">
+</div>
+
+<!-- Stats strip -->
+<div class="stats">
+  <div class="stat"><div class="stat-num" id="statTotal">—</div><div class="stat-label">Total</div></div>
+  <div class="stat"><div class="stat-num yellow" id="statPending">—</div><div class="stat-label">Pending</div></div>
+  <div class="stat"><div class="stat-num green" id="statCalled">—</div><div class="stat-label">Called</div></div>
+  <div class="stat"><div class="stat-num" id="statFeedback">—</div><div class="stat-label">Feedback</div></div>
+</div>
+
+<!-- Filter tabs -->
+<div class="filter-bar">
+  <button class="ftab active green" data-f="all" onclick="setFilter('all',this)">All</button>
+  <button class="ftab" data-f="pending" onclick="setFilter('pending',this)">Pending</button>
+  <button class="ftab" data-f="called" onclick="setFilter('called',this)">Called</button>
+  <button class="ftab" data-f="feedback" onclick="setFilter('feedback',this)">Has Feedback</button>
+</div>
+
+<!-- Lead list -->
+<div class="list" id="leadList">
+  <div class="loading"><div class="spinner"></div>Loading leads...</div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+var allLeads = [];
+var currentDate = todayIST();
+var currentFilter = 'all';
+
+function todayIST() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
+function formatDateLabel(d) {
+  var today = todayIST();
+  var yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  var yStr = yesterday.toISOString().split('T')[0];
+  var parts = d.split('-');
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var label = parts[2] + ' ' + months[parseInt(parts[1])-1] + ' ' + parts[0];
+  var sub = d === today ? 'Today' : (d === yStr ? 'Yesterday' : '');
+  return { label: label, sub: sub };
+}
+
+function resolvePhone(lead) {
+  if (lead.mobile) {
+    var d = lead.mobile.replace(/\D/g,'');
+    if (d.length >= 10 && d.length <= 13) {
+      var n = d.replace(/^91/,'');
+      return n.length === 10 ? '+91'+n : '+'+d;
+    }
+  }
+  if (lead.customerJid) {
+    var part = String(lead.customerJid).split('@')[0].replace(/\D/g,'');
+    if (part.length >= 10 && part.length <= 13) {
+      var n2 = part.replace(/^91/,'');
+      return n2.length === 10 ? '+91'+n2 : '+'+part;
+    }
+  }
+  return null;
+}
+
+function loadLeads() {
+  document.getElementById('leadList').innerHTML = '<div class="loading"><div class="spinner"></div>Loading leads...</div>';
+  var lbl = formatDateLabel(currentDate);
+  document.getElementById('dateLabel').textContent = lbl.label;
+  document.getElementById('dateSub').textContent = lbl.sub;
+  document.getElementById('datePicker').value = currentDate;
+
+  fetch('/booking/leads?date=' + currentDate)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      allLeads = d.leads || [];
+      updateStats();
+      renderLeads();
+    })
+    .catch(function(){
+      document.getElementById('leadList').innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Load nahi hua</div><div class="empty-sub">Server se connect nahi ho pa raha</div></div>';
+    });
+}
+
+function updateStats() {
+  var total = allLeads.length;
+  var called = allLeads.filter(function(l){ return l.called; }).length;
+  var feedback = allLeads.filter(function(l){ return l.feedbackGiven || l.feedback; }).length;
+  var pending = total - called;
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statPending').textContent = pending;
+  document.getElementById('statCalled').textContent = called;
+  document.getElementById('statFeedback').textContent = feedback;
+}
+
+function filteredLeads() {
+  if (currentFilter === 'pending') return allLeads.filter(function(l){ return !l.called; });
+  if (currentFilter === 'called') return allLeads.filter(function(l){ return l.called; });
+  if (currentFilter === 'feedback') return allLeads.filter(function(l){ return l.feedbackGiven || l.feedback; });
+  return allLeads;
+}
+
+function renderLeads() {
+  var leads = filteredLeads();
+  if (!leads.length) {
+    var msg = allLeads.length ? 'Is filter mein koi lead nahi' : 'Is date pe koi lead nahi';
+    document.getElementById('leadList').innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">'+msg+'</div><div class="empty-sub">'+currentDate+'</div></div>';
+    return;
+  }
+
+  var html = '';
+  leads.forEach(function(lead, i) {
+    var phone = resolvePhone(lead);
+    var isCalled = !!lead.called;
+    var hasFb = !!(lead.feedbackGiven || lead.feedback);
+    var cardClass = 'card' + (isCalled ? ' called' : '') + (hasFb ? ' has-feedback' : '');
+    var numBadgeClass = 'lead-num' + (currentDate === todayIST() ? ' new' : '');
+    var callHref = phone ? 'tel:' + phone.replace(/\s/g,'') : '#';
+    var callClass = 'call-btn' + (isCalled ? ' called' : '') + (!phone ? ' no-num' : '');
+    var callText = isCalled ? '📞 Called ✅' : ('📞 Call — ' + (phone || 'No number'));
+
+    html += '<div class="'+cardClass+'" id="card-'+lead.id+'">';
+    html += '<div class="card-top">';
+    html += '<div class="card-header">';
+    html += '<span class="'+numBadgeClass+'">Lead #'+lead.leadNum+'</span>';
+    html += '<div class="badges">';
+    if (isCalled) html += '<span class="badge called">Called</span>';
+    if (hasFb) html += '<span class="badge feedback">Feedback</span>';
+    html += '</div></div>';
+    html += '<div class="customer-name">'+(lead.naam || '— Unknown —')+'</div>';
+    html += '<div class="info-row">';
+    if (lead.vehicle) html += '<span class="info-item"><span class="icon">🏍️</span>'+lead.vehicle+'</span>';
+    if (lead.area) html += '<span class="info-item"><span class="icon">📍</span>'+lead.area+'</span>';
+    html += '</div>';
+    if (phone) {
+      html += '<div class="phone-num">'+phone+'</div>';
+    } else {
+      html += '<div class="phone-num no-num">Number nahi mila</div>';
+    }
+    html += '</div>';
+
+    html += '<div class="card-actions">';
+    if (phone) {
+      html += '<a href="'+callHref+'" class="'+callClass+'" onclick="markCalled(\''+lead.id+'\',event)">'+callText+'</a>';
+    } else {
+      html += '<span class="'+callClass+'">📞 Number nahi</span>';
+    }
+    html += '<button class="fb-btn'+(hasFb?' has':'')+'" onclick="toggleFb(\''+lead.id+'\')" title="Feedback">💬</button>';
+    html += '</div>';
+
+    html += '<div class="fb-drawer" id="fbdrawer-'+lead.id+'">';
+    if (hasFb && lead.feedback) {
+      html += '<div class="existing-fb">💬 '+escHtml(lead.feedback)+'</div>';
+    }
+    html += '<textarea class="fb-textarea" id="fbtext-'+lead.id+'" placeholder="Feedback likhо — jaise: Interested, kal aayenge / Band tha / Dobara call karna...">'+(lead.feedback||'')+'</textarea>';
+    html += '<button class="fb-save" id="fbsave-'+lead.id+'" onclick="saveFeedback(\''+lead.id+'\')">💾 Save Feedback</button>';
+    html += '</div>';
+
+    html += '</div>';
+  });
+
+  document.getElementById('leadList').innerHTML = html;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function markCalled(leadId, e) {
+  var lead = allLeads.find(function(l){ return l.id === leadId; });
+  if (!lead || lead.called) return;
+  fetch('/booking/leads/'+leadId+'/call', { method:'POST' })
+    .then(function(){
+      lead.called = true;
+      updateStats();
+      renderLeads();
+      showToast('📞 Called mark ho gaya!');
+    }).catch(function(){ showToast('❌ Error — dobara try karo'); });
+}
+
+function toggleFb(leadId) {
+  var drawer = document.getElementById('fbdrawer-'+leadId);
+  drawer.classList.toggle('open');
+  if (drawer.classList.contains('open')) {
+    var ta = document.getElementById('fbtext-'+leadId);
+    if (ta) setTimeout(function(){ ta.focus(); }, 100);
+  }
+}
+
+function saveFeedback(leadId) {
+  var ta = document.getElementById('fbtext-'+leadId);
+  var btn = document.getElementById('fbsave-'+leadId);
+  var text = ta.value.trim();
+  if (!text) { showToast('Pehle feedback likho'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  fetch('/booking/leads/'+leadId+'/feedback', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text:text})
+  }).then(function(r){ return r.json(); }).then(function(){
+    var lead = allLeads.find(function(l){ return l.id === leadId; });
+    if (lead) { lead.feedback = text; lead.feedbackGiven = true; }
+    updateStats();
+    renderLeads();
+    showToast('✅ Feedback save ho gaya!');
+  }).catch(function(){
+    btn.disabled = false;
+    btn.textContent = '💾 Save Feedback';
+    showToast('❌ Error — dobara try karo');
+  });
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.ftab').forEach(function(b){ b.classList.remove('active','green','yellow','red'); });
+  el.classList.add('active');
+  if (f==='all') el.classList.add('green');
+  else if (f==='pending') el.classList.add('yellow');
+  renderLeads();
+}
+
+function changeDate(delta) {
+  var d = new Date(currentDate);
+  d.setDate(d.getDate() + delta);
+  currentDate = d.toISOString().split('T')[0];
+  loadLeads();
+}
+
+function openDatePicker() {
+  var picker = document.getElementById('datePicker');
+  picker.value = currentDate;
+  picker.showPicker ? picker.showPicker() : picker.click();
+}
+
+function onDatePick() {
+  var val = document.getElementById('datePicker').value;
+  if (val) { currentDate = val; loadLeads(); }
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2500);
+}
+
+// Auto-refresh every 60 seconds
+setInterval(function(){
+  fetch('/booking/leads?date='+currentDate)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      allLeads = d.leads || [];
+      updateStats();
+      renderLeads();
+    }).catch(function(){});
+}, 60000);
+
+loadLeads();
+</script>
+</body>
+</html>

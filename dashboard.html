@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shivangi Auto Clinic — Team Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+  .header {
+    background: #075e54;
+    color: white;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .header h1 { font-size: 18px; }
+  .header .date { font-size: 13px; opacity: 0.85; }
+
+  .tabs {
+    display: flex;
+    background: #fff;
+    border-bottom: 2px solid #e0e0e0;
+    position: sticky;
+    top: 56px;
+    z-index: 9;
+  }
+  .tab {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #666;
+    border-bottom: 3px solid transparent;
+  }
+  .tab.active { color: #075e54; border-bottom-color: #075e54; }
+
+  .content { padding: 12px; max-width: 600px; margin: 0 auto; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 14px 10px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  .stat-card .num { font-size: 28px; font-weight: bold; }
+  .stat-card .label { font-size: 11px; color: #888; margin-top: 4px; }
+  .stat-card.green .num { color: #25d366; }
+  .stat-card.orange .num { color: #f39c12; }
+  .stat-card.blue .num { color: #3498db; }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #555;
+    margin: 16px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .lead-card {
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    border-left: 4px solid #ccc;
+  }
+  .lead-card.pending { border-left-color: #f39c12; }
+  .lead-card.called { border-left-color: #3498db; }
+  .lead-card.done { border-left-color: #25d366; }
+
+  .lead-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  .lead-naam { font-size: 16px; font-weight: bold; color: #222; }
+  .lead-status {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: bold;
+  }
+  .status-pending { background: #fff3cd; color: #856404; }
+  .status-called { background: #cce5ff; color: #004085; }
+  .status-done { background: #d4edda; color: #155724; }
+
+  .lead-info { font-size: 13px; color: #555; line-height: 1.8; }
+
+  .feedback-badge {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: bold;
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+  .feedback-badge.bad { background: #fce4ec; color: #c62828; }
+  .feedback-badge.neutral { background: #fff8e1; color: #f57f17; }
+
+  /* Big Call Button */
+  .btn-call-now {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    background: #25d366;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    margin-top: 12px;
+    letter-spacing: 0.5px;
+  }
+  .btn-call-now:active { background: #128c4e; }
+  .btn-call-now.grey { background: #95a5a6; }
+
+  .lead-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn:active { opacity: 0.7; }
+  .btn-done { background: #3498db; color: white; }
+  .btn-done.active { background: #1a6fa8; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .empty { text-align: center; padding: 40px 20px; color: #aaa; font-size: 15px; }
+  .empty .icon { font-size: 40px; margin-bottom: 10px; }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .toast.show { display: block; animation: fadeIn 0.3s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+  .refresh-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .booking-date { font-size: 12px; color: #888; margin-top: 4px; }
+
+  /* Feedback Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 500;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: white;
+    width: 100%;
+    max-width: 600px;
+    border-radius: 20px 20px 0 0;
+    padding: 20px;
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal h3 { font-size: 16px; margin-bottom: 16px; color: #222; text-align: center; }
+  .modal .phone-big { font-size: 22px; font-weight: bold; color: #075e54; text-align: center; margin-bottom: 16px; }
+
+  .feedback-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .feedback-opt {
+    padding: 14px 10px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    transition: all 0.2s;
+  }
+  .feedback-opt:active { transform: scale(0.97); }
+  .feedback-opt.interested { border-color: #25d366; color: #25d366; }
+  .feedback-opt.not-int { border-color: #e74c3c; color: #e74c3c; }
+  .feedback-opt.no-ans { border-color: #f39c12; color: #f39c12; }
+  .feedback-opt.callback { border-color: #3498db; color: #3498db; }
+  .feedback-opt.wrong { border-color: #95a5a6; color: #95a5a6; }
+  .feedback-opt.booked { border-color: #9b59b6; color: #9b59b6; }
+
+  .modal-cancel {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    background: #f5f5f5;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+    color: #666;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🛵 Shivangi Team</h1>
+    <div class="date" id="currentDate"></div>
+  </div>
+  <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('today')">Aaj</div>
+  <div class="tab" onclick="switchTab('all')">Sab Leads</div>
+</div>
+
+<div class="content">
+  <div id="todayTab" class="tab-content active">
+    <div class="stats" id="statsBox"></div>
+    <div id="leadsList"></div>
+  </div>
+  <div id="allTab" class="tab-content">
+    <div id="allLeadsList"></div>
+  </div>
+</div>
+
+<!-- Feedback Modal -->
+<div class="modal-overlay" id="feedbackModal">
+  <div class="modal">
+    <h3>📞 Call ka result kya raha?</h3>
+    <div class="phone-big" id="modalPhone"></div>
+    <div class="feedback-options">
+      <div class="feedback-opt interested" onclick="submitFeedback('✅ Interested')">✅ Interested</div>
+      <div class="feedback-opt not-int" onclick="submitFeedback('❌ Not Interested')">❌ Not Interested</div>
+      <div class="feedback-opt no-ans" onclick="submitFeedback('📵 No Answer')">📵 No Answer</div>
+      <div class="feedback-opt callback" onclick="submitFeedback('🔄 Call Back Karna')">🔄 Call Back Karna</div>
+      <div class="feedback-opt wrong" onclick="submitFeedback('❓ Wrong Number')">❓ Wrong Number</div>
+      <div class="feedback-opt booked" onclick="submitFeedback('📅 Booking Ho Gayi')">📅 Booking Ho Gayi</div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <input type="text" id="customFeedback" placeholder="✏️ Khud likho feedback..."
+        style="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;outline:none;"
+        onfocus="this.style.borderColor='#075e54'" onblur="this.style.borderColor='#e0e0e0'">
+      <button onclick="submitCustomFeedback()"
+        style="width:100%;margin-top:8px;padding:12px;background:#075e54;color:white;border:none;border-radius:10px;font-size:14px;font-weight:bold;cursor:pointer;">
+        💾 Save Feedback
+      </button>
+    </div>
+    <button class="modal-cancel" onclick="closeModal()">Baad mein batata hoon</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CLIENT_ID = '3fc23e36-1b49-40e4-a40b-3bc2c24562a7';
+const API = window.location.origin;
+let allData = { today: [], recent: [] };
+let currentLeadId = null;
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  if (tab === 'today') {
+    document.querySelectorAll('.tab')[0].classList.add('active');
+    document.getElementById('todayTab').classList.add('active');
+  } else {
+    document.querySelectorAll('.tab')[1].classList.add('active');
+    document.getElementById('allTab').classList.add('active');
+    renderAllLeads();
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function openFeedbackModal(leadId, phone) {
+  currentLeadId = leadId;
+  document.getElementById('modalPhone').textContent = '📱 ' + phone;
+  document.getElementById('feedbackModal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('feedbackModal').classList.remove('show');
+  document.getElementById('customFeedback').value = '';
+  currentLeadId = null;
+}
+
+async function submitCustomFeedback() {
+  const text = document.getElementById('customFeedback').value.trim();
+  if (!text) { showToast('Kuch likho pehle!'); return; }
+  await submitFeedback(text);
+}
+
+async function submitFeedback(feedback) {
+  if (!currentLeadId) return;
+  closeModal();
+  try {
+    await fetch(`${API}/booking/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId: currentLeadId, called: true, feedback })
+    });
+    showToast('✅ ' + feedback + ' — Saved!');
+    setTimeout(loadData, 400);
+  } catch(e) {
+    showToast('Error: ' + e.message);
+  }
+}
+
+async function markDone(leadId, btn) {
+  btn.disabled = true;
+  try {
+    await fetch(`${API}/booking/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId, serviceDone: true })
+    });
+    showToast('✅ Service Done mark ho gaya!');
+    setTimeout(loadData, 400);
+  } catch(e) {
+    showToast('Error: ' + e.message);
+    btn.disabled = false;
+  }
+}
+
+function getFeedbackBadge(feedback) {
+  if (!feedback) return '';
+  const bad = feedback.includes('Not Interested') || feedback.includes('Wrong Number');
+  const neutral = feedback.includes('No Answer') || feedback.includes('Call Back');
+  return `<div class="feedback-badge ${bad ? 'bad' : neutral ? 'neutral' : ''}">${feedback}</div>`;
+}
+
+function getStatusLabel(lead) {
+  if (lead.serviceDone) return '<span class="lead-status status-done">✅ Done</span>';
+  if (lead.called) return '<span class="lead-status status-called">📞 Called</span>';
+  return '<span class="lead-status status-pending">⏳ Pending</span>';
+}
+
+function getCardClass(lead) {
+  if (lead.serviceDone) return 'done';
+  if (lead.called) return 'called';
+  return 'pending';
+}
+
+function renderLead(lead, showDate = false) {
+  const mobile = lead.mobile || '';
+  const isCalled = lead.called;
+  const isDone = lead.serviceDone;
+
+  return `
+    <div class="lead-card ${getCardClass(lead)}" id="card-${lead.id}">
+      <div class="lead-header">
+        <div>
+          <div class="lead-naam">👤 ${lead.naam || mobile || 'N/A'}</div>
+          ${showDate ? `<div class="booking-date">📅 ${formatDate(lead.assignedDate)}</div>` : ''}
+        </div>
+        ${getStatusLabel(lead)}
+      </div>
+      <div class="lead-info">
+        ${lead.vehicle ? `<div>🏍️ ${lead.vehicle}</div>` : ''}
+        ${lead.area ? `<div>📍 ${lead.area}</div>` : ''}
+        <div>📱 <strong>${mobile}</strong></div>
+      </div>
+      ${getFeedbackBadge(lead.feedback)}
+
+      ${!isDone ? `
+        <a class="btn-call-now ${isCalled ? 'grey' : ''}"
+           href="tel:${mobile}"
+           onclick="if(!${isCalled}) setTimeout(()=>openFeedbackModal('${lead.id}','${mobile}'), 2000)">
+          📞 ${isCalled ? 'Dobara Call Karo' : 'CALL KARO'}
+        </a>
+        <div class="lead-actions">
+          ${!isCalled ? `<button class="btn btn-done" onclick="openFeedbackModal('${lead.id}','${mobile}')">✅ Call Ho Gayi</button>` : ''}
+          <button class="btn btn-done active" onclick="markDone(this.closest('.lead-card').id.replace('card-',''), this)" ${isDone ? 'disabled' : ''}>
+            🔧 ${isDone ? 'Done ✓' : 'Service Done'}
+          </button>
+        </div>
+      ` : `<div style="margin-top:10px;color:#25d366;font-weight:bold;">✅ Service Complete</div>`}
+    </div>
+  `;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function renderToday() {
+  const leads = allData.today;
+  const total = leads.length;
+  const called = leads.filter(l => l.called).length;
+  const done = leads.filter(l => l.serviceDone).length;
+  const pending = total - called;
+
+  document.getElementById('statsBox').innerHTML = `
+    <div class="stat-card orange">
+      <div class="num">${pending}</div>
+      <div class="label">Call Baaki</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="num">${called}</div>
+      <div class="label">Call Ho Gaya</div>
+    </div>
+    <div class="stat-card green">
+      <div class="num">${done}</div>
+      <div class="label">Service Done</div>
+    </div>
+  `;
+
+  if (leads.length === 0) {
+    document.getElementById('leadsList').innerHTML = `<div class="empty"><div class="icon">📭</div>Aaj koi lead nahi</div>`;
+    return;
+  }
+
+  const pending_leads = leads.filter(l => !l.called && !l.serviceDone);
+  const called_leads = leads.filter(l => l.called && !l.serviceDone);
+  const done_leads = leads.filter(l => l.serviceDone);
+
+  let html = '';
+  if (pending_leads.length) {
+    html += `<div class="section-title">⏳ Call Baaki (${pending_leads.length})</div>`;
+    html += pending_leads.map(l => renderLead(l)).join('');
+  }
+  if (called_leads.length) {
+    html += `<div class="section-title">📞 Called (${called_leads.length})</div>`;
+    html += called_leads.map(l => renderLead(l)).join('');
+  }
+  if (done_leads.length) {
+    html += `<div class="section-title">✅ Service Done (${done_leads.length})</div>`;
+    html += done_leads.map(l => renderLead(l)).join('');
+  }
+
+  document.getElementById('leadsList').innerHTML = html;
+}
+
+function renderAllLeads() {
+  const leads = allData.recent;
+  if (!leads || leads.length === 0) {
+    document.getElementById('allLeadsList').innerHTML = `<div class="empty"><div class="icon">📭</div>Koi lead nahi</div>`;
+    return;
+  }
+
+  const groups = {};
+  leads.forEach(l => {
+    const d = l.assignedDate || 'Unknown';
+    if (!groups[d]) groups[d] = [];
+    groups[d].push(l);
+  });
+
+  let html = '';
+  Object.keys(groups).sort().reverse().forEach(date => {
+    const d = new Date(date);
+    const label = d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+    html += `<div class="section-title">📅 ${label}</div>`;
+    html += groups[date].map(l => renderLead(l, false)).join('');
+  });
+
+  document.getElementById('allLeadsList').innerHTML = html;
+}
+
+async function loadData() {
+  try {
+    const res = await fetch(`${API}/booking/dashboard?clientId=${CLIENT_ID}`);
+    allData = await res.json();
+    renderToday();
+    highlightLeadFromUrl();
+  } catch(e) {
+    showToast('Server se connect nahi ho pa raha');
+  }
+}
+
+function highlightLeadFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const leadId = params.get('lead');
+  if (!leadId) return;
+  const card = document.getElementById('card-' + leadId);
+  if (!card) return;
+  card.style.border = '3px solid #075e54';
+  card.style.boxShadow = '0 0 12px rgba(7,94,84,0.5)';
+  setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+}
+
+// Close modal on overlay click
+document.getElementById('feedbackModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+const now = new Date();
+document.getElementById('currentDate').textContent = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>

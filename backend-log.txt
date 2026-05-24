@@ -1,0 +1,8 @@
+[DB] Local JSON database ready — data.json
+[Server] Running on port 3000
+[Reporter] Initialized
+[Booking] Initialized — 3 cron jobs active
+[WA] Webhook set for: shivangi auto clinic | instance: 7107608885
+[WA] Green API mode active — no local sessions needed
+[Admin] GET /clients — 1 found
+[Admin] GET /clients — 1 found

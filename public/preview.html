@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lead Management Preview</title>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --bg: #0F172A;
+            --surface: #1E293B;
+            --text: #F8FAFC;
+            --text-muted: #94A3B8;
+            --border: #334155;
+            
+            --tag-new: #3B82F6;
+            --tag-hot: #EF4444;
+            --tag-followup: #F59E0B;
+            --tag-converted: #10B981;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                align-items: center;
+                padding: 1rem;
+            }
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: white;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.75rem;
+        }
+
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter:hover, .filter.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .form-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-submit {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.8rem;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-top: 1rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn-submit:hover {
+            opacity: 0.9;
+        }
+
+        /* Mock List Items */
+        .lead-item {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .lead-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .lead-name { font-weight: 600; }
+        .lead-phone { font-size: 0.85rem; color: var(--text-muted); }
+        
+        .tag {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .tag.hot { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; }
+        .tag.new { background: rgba(59, 130, 246, 0.2); color: #93C5FD; }
+    </style>
+</head>
+<body>
+
+<!-- LIST PANEL -->
+<section class="panel">
+  <div class="section-title">Lead Management</div>
+  <div class="filters">
+    <button class="filter active" data-f="new">New</button>
+    <button class="filter" data-f="hot">Hot</button>
+    <button class="filter" data-f="followup">Follow-up</button>
+    <button class="filter" data-f="converted">Converted</button>
+    <button class="filter" data-f="notint">Not Int.</button>
+    <button class="filter" data-f="dnc">DNC</button>
+  </div>
+  <div id="allList">
+    <div class="lead-item">
+        <div class="lead-info">
+            <span class="lead-name">Rajesh Patel</span>
+            <span class="lead-phone">+91 9876543210</span>
+        </div>
+        <span class="tag hot">HOT</span>
+    </div>
+    <div class="lead-item">
+        <div class="lead-info">
+            <span class="lead-name">Suresh Verma</span>
+            <span class="lead-phone">+91 8765432109</span>
+        </div>
+        <span class="tag new">NEW</span>
+    </div>
+  </div>
+</section>
+
+<!-- ADD PANEL -->
+<section class="panel" id="panel-add">
+  <div class="section-title">Add New Lead</div>
+  <div class="form-grid">
+    <div class="field">
+      <label>Customer Name *</label>
+      <input class="input" id="addName" placeholder="e.g. Rajesh Patel">
+    </div>
+    <div class="field">
+      <label>Phone Number * (10 digit)</label>
+      <input class="input" id="addPhone" placeholder="e.g. 9876543210">
+    </div>
+    <div class="field">
+      <label>Vehicle Model (Optional)</label>
+      <input class="input" id="addVehicle" placeholder="e.g. Yamaha R15">
+    </div>
+    <button class="btn-submit">Save Lead</button>
+  </div>
+</section>
+
+</body>
+</html>

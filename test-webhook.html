@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Webhook Tester</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .card { background: #1e293b; border-radius: 16px; padding: 32px; width: 100%; max-width: 520px; border: 1px solid #334155; }
+  h2 { font-size: 20px; margin-bottom: 6px; color: #4ade80; }
+  .sub { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+  label { font-size: 12px; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 6px; margin-top: 16px; }
+  input, textarea, select { width: 100%; background: #0f172a; border: 1.5px solid #334155; border-radius: 8px; padding: 10px 12px; font-size: 14px; color: #e2e8f0; outline: none; font-family: inherit; }
+  textarea { resize: vertical; min-height: 80px; }
+  input:focus, textarea:focus { border-color: #25d366; }
+  button { width: 100%; background: #25d366; color: #000; border: none; border-radius: 9px; padding: 13px; font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 20px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .reply-box { margin-top: 20px; background: #0f172a; border: 1.5px solid #166534; border-radius: 10px; padding: 16px; font-size: 14px; color: #4ade80; line-height: 1.7; white-space: pre-wrap; display: none; }
+  .error-box { margin-top: 20px; background: #450a0a; border: 1.5px solid #7f1d1d; border-radius: 10px; padding: 16px; font-size: 14px; color: #f87171; display: none; }
+  .status { font-size: 12px; color: #64748b; margin-top: 8px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🤖 AutoResponder Webhook Tester</h2>
+  <p class="sub">Directly test karo — AutoResponder app ki zaroorat nahi</p>
+
+  <label>Webhook URL</label>
+  <input type="text" id="url" value="http://localhost:3000/autoresponder/3fc23e36-1b49-40e4-a40b-3bc2c24562a7" />
+
+  <label>Sender Phone (fake number chalega)</label>
+  <input type="text" id="phone" value="919876543210" />
+
+  <label>Message</label>
+  <textarea id="message" placeholder="Koi bhi message likho...">hello bhai, oil change ka kya rate hai?</textarea>
+
+  <button id="btn" onclick="sendTest()">▶ Test Bhejo</button>
+  <div class="status" id="status"></div>
+
+  <div class="reply-box" id="reply"></div>
+  <div class="error-box" id="error"></div>
+</div>
+
+<script>
+async function sendTest() {
+  const url     = document.getElementById('url').value.trim();
+  const phone   = document.getElementById('phone').value.trim();
+  const message = document.getElementById('message').value.trim();
+  const btn     = document.getElementById('btn');
+  const statusEl = document.getElementById('status');
+  const replyEl  = document.getElementById('reply');
+  const errorEl  = document.getElementById('error');
+
+  if (!message) { alert('Message likho pehle!'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Bhej raha hai...';
+  statusEl.textContent = '';
+  replyEl.style.display = 'none';
+  errorEl.style.display = 'none';
+
+  const t0 = Date.now();
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, conversation: phone, sender: phone, group: false })
+    });
+    const data = await res.json();
+    const ms = Date.now() - t0;
+
+    if (data.reply) {
+      replyEl.textContent = '🤖 AI Reply:\n\n' + data.reply;
+      replyEl.style.display = 'block';
+      statusEl.textContent = `✅ ${ms}ms mein reply aaya`;
+    } else {
+      errorEl.textContent = '⚠️ Reply null aaya — client active hai? Client ID sahi hai?';
+      errorEl.style.display = 'block';
+    }
+  } catch (err) {
+    errorEl.textContent = '❌ Server se connect nahi hua!\n\nCheck karo:\n• Backend chal raha hai? (node index.js)\n• URL sahi hai?\n\nError: ' + err.message;
+    errorEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Test Bhejo';
+  }
+}
+
+// Enter key se bhi bhej sako
+document.getElementById('message').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') sendTest();
+});
+</script>
+</body>
+</html>

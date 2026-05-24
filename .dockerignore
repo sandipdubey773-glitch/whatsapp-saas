@@ -1,0 +1,13 @@
+node_modules
+sessions
+*.log
+*.pem
+*.key
+.env
+data.json
+bookings.json
+SESSION_CHECKPOINT.md
+tunnel-new.log
+frontend/node_modules
+backend/node_modules
+.git

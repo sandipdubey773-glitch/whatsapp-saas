@@ -1,0 +1,29 @@
+{
+  "name": "whatsapp-saas-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "build": "cd frontend && npm install && npm run build",
+    "postinstall": "printf '#!/bin/bash\nexport PATH=\"/root/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH\"\ncd /app\nexec node index.js\n' > /usr/local/bin/admin.shivangiautoclinic.com 2>/dev/null && chmod +x /usr/local/bin/admin.shivangiautoclinic.com 2>/dev/null || true"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc10",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "lowdb": "^1.0.0",
+    "node-cron": "^4.2.1",
+    "pino": "^10.3.1",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

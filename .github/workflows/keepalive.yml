@@ -1,0 +1,15 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # har 5 minute
+  workflow_dispatch:         # manual trigger bhi
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Server
+        run: |
+          curl -s https://shivangi-saas-bot.onrender.com/health
+          echo "Ping done"
