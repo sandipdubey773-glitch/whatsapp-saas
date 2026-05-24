@@ -7,6 +7,12 @@ const PLAN_COLORS = {
   growth: { bg: 'rgba(6,182,212,0.12)', text: '#22d3ee', label: 'Growth' },
   pro: { bg: 'rgba(245,158,11,0.12)', text: '#fbbf24', label: 'Pro' }
 };
+const AI_LABELS = {
+  gemini: 'Gemini',
+  openai: 'GPT-4o',
+  claude: 'Claude',
+  openrouter: 'OpenRouter',
+};
 
 export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs }) {
   const navigate = useNavigate();
@@ -140,6 +146,11 @@ export default function ClientCard({ client, onToggle, onDelete, onEdit, onLogs 
                 background: planInfo.bg,
                 color: planInfo.text
               }}>{planInfo.label}</span>
+              {client.aiProvider && (
+                <span className="badge" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399' }}>
+                  🤖 {AI_LABELS[client.aiProvider] || client.aiProvider}
+                </span>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
               {/* Status */}
