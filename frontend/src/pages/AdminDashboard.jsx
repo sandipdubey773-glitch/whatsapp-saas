@@ -226,11 +226,11 @@ export default function AdminDashboard({ onLogout }) {
           <div className="grid-2">
             {filtered.map(client => (
               <ClientCard
-                key={client._id}
+                key={client.id}
                 client={client}
-                onToggle={() => handleToggle(client._id)}
-                onDelete={() => handleDelete(client._id)}
-                onLogs={() => navigate('/client/' + client._id + '/logs')}
+                onToggle={() => handleToggle(client.id)}
+                onDelete={() => handleDelete(client.id)}
+                onLogs={() => navigate('/client/' + client.id + '/logs')}
               />
             ))}
           </div>
