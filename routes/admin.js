@@ -145,7 +145,7 @@ router.post('/clients', (req, res) => {
         .catch(e => console.error('[Admin] Webhook set error:', e.message));
     }
 
-    res.json({ ...client, waStatus: 'open' });
+    res.json({ ...client, waStatus: 'close' });
   } catch (err) {
     console.error('[Admin] POST /clients:', err.message);
     res.status(500).json({ error: err.message });

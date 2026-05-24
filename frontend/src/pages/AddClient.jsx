@@ -110,7 +110,7 @@ export default function AddClient() {
                 <span>3️⃣</span>
                 <span>Webhook URL copy karo → </span>
                 <code style={{ background: '#1e293b', padding: '1px 6px', borderRadius: 4, color: '#60a5fa', fontSize: 11 }}>
-                  https://shivangi-saas-bot.onrender.com/meta/webhook
+                  https://api.shivangiautoclinic.com/meta/webhook
                 </code>
               </div>
               <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" rel="noopener noreferrer"

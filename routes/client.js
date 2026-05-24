@@ -126,7 +126,7 @@ router.get('/meta-config', (req, res) => {
     metaPhoneNumberId: c.metaPhoneNumberId || '',
     metaVerifyToken: c.metaVerifyToken || '',
     hasAccessToken: !!(c.metaAccessToken),
-    webhookUrl: 'https://shivangi-saas-bot.onrender.com/meta/webhook',
+    webhookUrl: 'https://api.shivangiautoclinic.com/meta/webhook',
   });
 });
 
