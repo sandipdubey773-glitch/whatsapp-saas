@@ -45,7 +45,7 @@ export default function App() {
     <BrowserRouter basename={basename}>
       <Routes>
         <Route path="/client-login" element={
-          clientToken ? <Navigate to="/client-portal" /> : <ClientLogin onLogin={handleClientLogin} />
+          <ClientLogin onLogin={handleClientLogin} />
         } />
         <Route path="/client-portal" element={
           clientToken ? <ClientPortal onLogout={handleClientLogout} /> : <Navigate to="/client-login" />

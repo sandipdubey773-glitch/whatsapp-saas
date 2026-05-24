@@ -16,6 +16,12 @@ export default function ClientLogin({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Clear any previously stored token when login page opens
+  React.useEffect(() => {
+    localStorage.removeItem('clientToken');
+    localStorage.removeItem('clientName');
+  }, []);
+
   const handleLogin = async () => {
     if (!form.username.trim() || !form.password.trim()) {
       setError('Username aur password daalein');
