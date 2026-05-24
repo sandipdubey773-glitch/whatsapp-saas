@@ -350,10 +350,6 @@ export default function ClientPortal({ onLogout }) {
                 <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Plan</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', textTransform: 'capitalize' }}>{me?.plan}</div>
               </div>
-              <div style={{ background: '#1e293b', borderRadius: 12, padding: 18, border: '1px solid #334155' }}>
-                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>AI Provider</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', textTransform: 'capitalize' }}>{me?.aiProvider}</div>
-              </div>
             </div>
 
             {/* Send report shortcut */}

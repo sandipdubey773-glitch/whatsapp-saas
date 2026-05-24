@@ -35,7 +35,6 @@ router.get('/me', (req, res) => {
     id: c.id,
     name: c.name,
     plan: c.plan,
-    aiProvider: c.aiProvider,
     waStatus: getStatus(c.id),
     permissions: c.permissions || {},
     createdAt: c.createdAt,
