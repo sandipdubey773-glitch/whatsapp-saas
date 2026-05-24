@@ -94,7 +94,7 @@ export default function Login({ onLogin }) {
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             marginBottom: '6px'
-          }}>WaFlou</h1>
+          }}>WaFlow</h1>
           <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
             Admin Panel
           </p>

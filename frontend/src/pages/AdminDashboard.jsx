@@ -72,7 +72,7 @@ export default function AdminDashboard({ onLogout }) {
             boxShadow: '0 4px 12px rgba(99,102,241,0.3)'
           }}>🤖</div>
           <span style={{ fontWeight: '700', fontSize: '1.1rem', color: '#f1f5f9' }}>
-            Wa<span style={{ color: '#818cf8' }}>Flou</span>
+            Wa<span style={{ color: '#818cf8' }}>Flow</span>
           </span>
           <div style={{
             padding: '3px 10px',

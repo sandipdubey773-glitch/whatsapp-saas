@@ -105,7 +105,7 @@ export default function ClientLogin({ onLogin }) {
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             marginBottom: '6px'
-          }}>WaFlou</h1>
+          }}>WaFlow</h1>
           <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
             Sign in to your dashboard
           </p>

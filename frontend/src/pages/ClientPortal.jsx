@@ -295,7 +295,7 @@ export default function ClientPortal({ onLogout }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 20 }}>🤖</span>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#818cf8', letterSpacing: 1 }}>WaFlou</div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#818cf8', letterSpacing: 1 }}>WaFlow</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0' }}>{me?.name}</div>
             <div style={{ fontSize: 11, color: me?.waStatus === 'open' ? '#25d366' : '#f87171' }}>
               WhatsApp: {me?.waStatus === 'open' ? 'Connected' : 'Disconnected'}
