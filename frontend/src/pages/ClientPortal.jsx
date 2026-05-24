@@ -147,10 +147,13 @@ export default function ClientPortal({ onLogout }) {
     } catch {}
   };
 
+  const [waBotPhone, setWaBotPhone] = useState('');
+
   const fetchWAStatus = useCallback(async () => {
     try {
       const r = await clientApi.getWAStatus();
       setWaStatus(r.data.status);
+      if (r.data.botPhone) { setWaBotPhone(r.data.botPhone); setWaPhone(r.data.botPhone); }
       if (r.data.qr) setWaQr(r.data.qr);
       if (r.data.pairingCode) setWaPairingCode(r.data.pairingCode);
       if (r.data.status === 'open') {
@@ -603,14 +606,24 @@ export default function ClientPortal({ onLogout }) {
               ) : (
                 <>
                   <div style={{ marginBottom: 12 }}>
-                    <label style={{ ...lbl }}>Phone Number (Pairing Code ke liye)</label>
+                    <label style={{ ...lbl }}>
+                      Bot WhatsApp Number
+                      {waBotPhone && <span style={{ color: '#f59e0b', marginLeft: 6, fontSize: 10 }}>🔒 Admin locked</span>}
+                    </label>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <input style={{ ...inp, flex: 1 }} placeholder="919876543210 (country code ke saath)" value={waPhone} onChange={e => setWaPhone(e.target.value)} />
+                      <input
+                        style={{ ...inp, flex: 1, opacity: waBotPhone ? 0.7 : 1, cursor: waBotPhone ? 'not-allowed' : 'text' }}
+                        placeholder="919876543210 (country code ke saath)"
+                        value={waPhone}
+                        onChange={e => { if (!waBotPhone) setWaPhone(e.target.value); }}
+                        readOnly={!!waBotPhone}
+                      />
                       <button onClick={handleWAConnect} disabled={waConnecting || !waPhone.trim()}
-                        style={{ background: waConnecting || !waPhone.trim() ? '#334155' : '#25d366', border: 'none', borderRadius: 9, padding: '10px 16px', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                        style={{ background: waConnecting || !waPhone.trim() ? '#334155' : '#25d366', border: 'none', borderRadius: 9, padding: '10px 16px', fontSize: 13, fontWeight: 700, color: '#fff', cursor: waConnecting || !waPhone.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                         {waConnecting ? '...' : 'Get Code'}
                       </button>
                     </div>
+                    {waBotPhone && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>Sirf yahi number connect ho sakta hai</div>}
                   </div>
 
                   {waPairingCode && (

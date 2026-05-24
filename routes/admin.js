@@ -182,6 +182,7 @@ router.put('/clients/:id', (req, res) => {
     if (body.businessHoursEnd !== undefined)       updates.businessHoursEnd = body.businessHoursEnd;
     if (body.businessClosedMessage !== undefined)  updates.businessClosedMessage = body.businessClosedMessage;
     if (body.typingDelayEnabled !== undefined)     updates.typingDelayEnabled = body.typingDelayEnabled;
+    if (body.botPhone !== undefined)               updates.botPhone = body.botPhone;
     db.get('clients').find({ id }).assign(updates).write();
     console.log('[Admin] Updated client:', id);
     res.json({ success: true });

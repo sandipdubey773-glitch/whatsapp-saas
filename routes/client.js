@@ -204,13 +204,22 @@ router.get('/wa-status', async (req, res) => {
     try { const QRCode = require('qrcode'); qr = await QRCode.toDataURL(rawQr, { width: 256, margin: 2 }); }
     catch(e) { qr = rawQr; }
   }
-  res.json({ status, qr, pairingCode: getPairingCode(c.id) });
+  res.json({ status, qr, pairingCode: getPairingCode(c.id), botPhone: c.botPhone || '' });
 });
 
 // POST /client/wa-connect — start Baileys session (QR or pairing code)
 router.post('/wa-connect', async (req, res) => {
   const c = req.clientData;
   const { phone } = req.body;
+
+  // Validate phone against admin-configured botPhone
+  if (c.botPhone && phone) {
+    const clean = (n) => String(n).replace(/\D/g, '');
+    if (clean(phone) !== clean(c.botPhone)) {
+      return res.status(400).json({ error: `Sirf admin ka set kiya hua number connect ho sakta hai: ${c.botPhone}` });
+    }
+  }
+
   try {
     startClient(c.id, phone || null).catch(e => console.error('[Client] wa-connect error:', e.message));
     res.json({ ok: true, message: phone ? 'Pairing code 10-15 sec mein aayega' : 'QR 15-20 sec mein tayar hoga' });

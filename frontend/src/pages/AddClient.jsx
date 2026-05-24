@@ -12,7 +12,7 @@ const PERM_LIST = [
   { key: 'editPrompt',        label: 'System Prompt edit karna', desc: 'Bot ka prompt change kare' },
 ];
 
-const blank = { name: '', aiProvider: 'gemini', aiKey: '', systemPrompt: '', plan: 'starter', googleSheetWebhook: '', reportPhone: '', ownerPhone: '', leadGroup: '', metaPhoneNumberId: '', metaAccessToken: '', metaVerifyToken: '', clientUsername: '', clientPassword: '', permissions: {}, businessHoursEnabled: false, businessHoursStart: '09:00', businessHoursEnd: '20:00', businessClosedMessage: 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: false };
+const blank = { name: '', aiProvider: 'gemini', aiKey: '', systemPrompt: '', plan: 'starter', googleSheetWebhook: '', reportPhone: '', ownerPhone: '', leadGroup: '', botPhone: '', metaPhoneNumberId: '', metaAccessToken: '', metaVerifyToken: '', clientUsername: '', clientPassword: '', permissions: {}, businessHoursEnabled: false, businessHoursStart: '09:00', businessHoursEnd: '20:00', businessClosedMessage: 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: false };
 const inp = { width: '100%', background: '#0f172a', border: '1.5px solid #334155', borderRadius: 9, padding: '11px 13px', fontSize: 14, color: '#e2e8f0', outline: 'none', fontFamily: 'inherit' };
 const sel = { ...inp, appearance: 'none', cursor: 'pointer' };
 const lbl = { display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 };
@@ -28,9 +28,9 @@ export default function AddClient() {
 
   useEffect(() => {
     if (!isEdit) return;
-    api.getClients().then(res => {
-      const c = res.data.clients.find(c => c.id === id);
-      if (c) setForm({ name: c.name || '', aiProvider: c.aiProvider || 'gemini', aiKey: c.aiKey || '', systemPrompt: c.systemPrompt || '', plan: c.plan || 'starter', googleSheetWebhook: c.googleSheetWebhook || '', reportPhone: c.reportPhone || '', ownerPhone: c.ownerPhone || '', leadGroup: c.leadGroup || '', metaPhoneNumberId: c.metaPhoneNumberId || '', metaAccessToken: c.metaAccessToken || '', metaVerifyToken: c.metaVerifyToken || '', clientUsername: c.clientUsername || '', clientPassword: c.clientPassword || '', permissions: c.permissions || {}, businessHoursEnabled: c.businessHoursEnabled || false, businessHoursStart: c.businessHoursStart || '09:00', businessHoursEnd: c.businessHoursEnd || '20:00', businessClosedMessage: c.businessClosedMessage || 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: c.typingDelayEnabled || false });
+    api.getClients().then(clients => {
+      const c = (Array.isArray(clients) ? clients : clients.clients || []).find(c => c.id === id);
+      if (c) setForm({ name: c.name || '', aiProvider: c.aiProvider || 'gemini', aiKey: c.aiKey || '', systemPrompt: c.systemPrompt || '', plan: c.plan || 'starter', googleSheetWebhook: c.googleSheetWebhook || '', reportPhone: c.reportPhone || '', ownerPhone: c.ownerPhone || '', leadGroup: c.leadGroup || '', botPhone: c.botPhone || '', metaPhoneNumberId: c.metaPhoneNumberId || '', metaAccessToken: c.metaAccessToken || '', metaVerifyToken: c.metaVerifyToken || '', clientUsername: c.clientUsername || '', clientPassword: c.clientPassword || '', permissions: c.permissions || {}, businessHoursEnabled: c.businessHoursEnabled || false, businessHoursStart: c.businessHoursStart || '09:00', businessHoursEnd: c.businessHoursEnd || '20:00', businessClosedMessage: c.businessClosedMessage || 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: c.typingDelayEnabled || false });
     }).catch(console.error);
   }, [id]);
 
@@ -137,7 +137,7 @@ export default function AddClient() {
             <input style={inp} value={form.metaVerifyToken} onChange={e => set('metaVerifyToken', e.target.value)} placeholder="shivangi_verify_2026" />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Koi bhi secret string — Meta webhook setup mein yahi daalo</div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
             <div>
               <label style={lbl}>Owner WhatsApp Number</label>
               <input style={inp} value={form.ownerPhone} onChange={e => set('ownerPhone', e.target.value)} placeholder="9327363931" />
@@ -148,6 +148,11 @@ export default function AddClient() {
               <input style={inp} value={form.leadGroup} onChange={e => set('leadGroup', e.target.value)} placeholder="9327363931" />
               <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Leads aur reports is number pe jayenge</div>
             </div>
+          </div>
+          <div>
+            <label style={lbl}>Bot WhatsApp Number 🔒</label>
+            <input style={inp} value={form.botPhone} onChange={e => set('botPhone', e.target.value)} placeholder="919876543210 (country code ke saath)" />
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Client sirf yahi number connect kar sakta hai — koi aur number allow nahi hoga</div>
           </div>
         </div>
 
