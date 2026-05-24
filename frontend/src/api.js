@@ -63,5 +63,7 @@ export const clientApi = {
   getWAStatus:     ()             => axios.get(`${BASE}/client/wa-status`,                                         { headers: clientHeaders() }),
   connectWA:       (phone)        => axios.post(`${BASE}/client/wa-connect`, phone ? { phone } : {},               { headers: clientHeaders() }),
   disconnectWA:    ()             => axios.post(`${BASE}/client/wa-disconnect`, {},                                 { headers: clientHeaders() }),
-  bulkSend:        (numbers, message) => axios.post(`${BASE}/client/bulk-send`, { numbers, message },              { headers: clientHeaders() }),
+  bulkSend:            (numbers, message)                        => axios.post(`${BASE}/client/bulk-send`, { numbers, message },                                        { headers: clientHeaders() }),
+  getTemplates:        ()                                        => axios.get(`${BASE}/client/templates`,                                                               { headers: clientHeaders() }),
+  templateBroadcast:   (numbers, templateName, language, bodyVars) => axios.post(`${BASE}/client/bulk-send-template`, { numbers, templateName, language, bodyVars },  { headers: clientHeaders() }),
 };

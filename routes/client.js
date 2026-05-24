@@ -125,6 +125,7 @@ router.get('/meta-config', (req, res) => {
   res.json({
     metaPhoneNumberId: c.metaPhoneNumberId || '',
     metaVerifyToken: c.metaVerifyToken || '',
+    metaWabaId: c.metaWabaId || '',
     hasAccessToken: !!(c.metaAccessToken),
     webhookUrl: 'https://api.shivangiautoclinic.com/meta/webhook',
   });
@@ -133,11 +134,12 @@ router.get('/meta-config', (req, res) => {
 // PUT /client/meta-config
 router.put('/meta-config', (req, res) => {
   const c = req.clientData;
-  const { metaPhoneNumberId, metaAccessToken, metaVerifyToken } = req.body;
+  const { metaPhoneNumberId, metaAccessToken, metaVerifyToken, metaWabaId } = req.body;
   const updates = {};
   if (metaPhoneNumberId !== undefined) updates.metaPhoneNumberId = metaPhoneNumberId;
   if (metaAccessToken)                 updates.metaAccessToken = metaAccessToken;
   if (metaVerifyToken !== undefined)   updates.metaVerifyToken = metaVerifyToken;
+  if (metaWabaId !== undefined)        updates.metaWabaId = metaWabaId;
   db.get('clients').find({ id: c.id }).assign(updates).write();
   res.json({ success: true });
 });
@@ -247,6 +249,36 @@ router.post('/meta-test', async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// GET /client/templates
+router.get('/templates', async (req, res) => {
+  const c = req.clientData;
+  if (!c.metaWabaId || !c.metaAccessToken) return res.status(400).json({ error: 'WABA ID aur Access Token pehle save karo' });
+  try {
+    const templates = await metaApi.getTemplates(c.metaWabaId, c.metaAccessToken);
+    res.json({ templates });
+  } catch(err) { res.status(400).json({ error: err.message }); }
+});
+
+// POST /client/bulk-send-template
+router.post('/bulk-send-template', async (req, res) => {
+  const c = req.clientData;
+  if (!c.metaPhoneNumberId || !c.metaAccessToken) return res.status(400).json({ error: 'Meta credentials pehle save karo' });
+  const { numbers, templateName, language, bodyVars } = req.body;
+  if (!numbers || !Array.isArray(numbers) || !numbers.length) return res.status(400).json({ error: 'Numbers required' });
+  if (!templateName) return res.status(400).json({ error: 'Template name required' });
+  const results = { sent: 0, failed: 0, errors: [] };
+  for (const num of numbers) {
+    const clean = String(num).replace(/\D/g, '');
+    if (!clean || clean.length < 10) { results.failed++; continue; }
+    try {
+      await metaApi.sendTemplate(c.metaPhoneNumberId, c.metaAccessToken, clean, templateName, language, bodyVars);
+      results.sent++;
+    } catch(e) { results.failed++; results.errors.push({ number: clean, error: e.message }); }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  res.json({ success: true, ...results });
 });
 
 // POST /client/bulk-send

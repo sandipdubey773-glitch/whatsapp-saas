@@ -35,8 +35,8 @@ export default function ClientPortal({ onLogout }) {
   const [reportSending, setReportSending] = useState(false);
   const [promptSaving, setPromptSaving] = useState(false);
   const [search, setSearch] = useState('');
-  const [metaConfig, setMetaConfig] = useState({ metaPhoneNumberId: '', metaVerifyToken: '', hasAccessToken: false, webhookUrl: '' });
-  const [metaForm, setMetaForm] = useState({ metaPhoneNumberId: '', metaAccessToken: '', metaVerifyToken: '' });
+  const [metaConfig, setMetaConfig] = useState({ metaPhoneNumberId: '', metaVerifyToken: '', metaWabaId: '', hasAccessToken: false, webhookUrl: '' });
+  const [metaForm, setMetaForm] = useState({ metaPhoneNumberId: '', metaAccessToken: '', metaVerifyToken: '', metaWabaId: '' });
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaTesting, setMetaTesting] = useState(false);
   const [testPhone, setTestPhone] = useState('');
@@ -67,6 +67,13 @@ export default function ClientPortal({ onLogout }) {
   const [bcMessage, setBcMessage] = useState('');
   const [bcSending, setBcSending] = useState(false);
   const [bcResult, setBcResult] = useState(null);
+  const [bcMode, setBcMode] = useState('text'); // 'text' | 'template'
+  // Templates state
+  const [templates, setTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState('');
+  const [selTemplate, setSelTemplate] = useState(null);
+  const [bodyVars, setBodyVars] = useState([]);
 
   useEffect(() => { fetchMe(); }, []);
 
@@ -148,8 +155,17 @@ export default function ClientPortal({ onLogout }) {
     try {
       const r = await clientApi.getMetaConfig();
       setMetaConfig(r.data);
-      setMetaForm(f => ({ ...f, metaPhoneNumberId: r.data.metaPhoneNumberId, metaVerifyToken: r.data.metaVerifyToken }));
+      setMetaForm(f => ({ ...f, metaPhoneNumberId: r.data.metaPhoneNumberId, metaVerifyToken: r.data.metaVerifyToken, metaWabaId: r.data.metaWabaId || '' }));
     } catch {}
+  };
+
+  const fetchTemplates = async () => {
+    setTemplatesLoading(true); setTemplatesError('');
+    try {
+      const r = await clientApi.getTemplates();
+      setTemplates(r.data.templates || []);
+    } catch(e) { setTemplatesError(e.response?.data?.error || e.message); }
+    setTemplatesLoading(false);
   };
 
   const [waBotPhone, setWaBotPhone] = useState('');
@@ -590,51 +606,120 @@ export default function ClientPortal({ onLogout }) {
         {activeTab === 'broadcast' && (
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>📢 Broadcast</div>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>Ek saath kai customers ko message bhejo</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>Ek saath kai customers ko message bhejo</div>
+
+            {/* Mode Toggle */}
+            {!bcResult && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                <button onClick={() => { setBcMode('text'); setSelTemplate(null); setBodyVars([]); }}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: `2px solid ${bcMode==='text'?'#25d366':'#334155'}`, background: bcMode==='text'?'rgba(37,211,102,0.1)':'#1e293b', color: bcMode==='text'?'#25d366':'#64748b', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  💬 Free Text
+                </button>
+                <button onClick={() => { setBcMode('template'); if (templates.length === 0) fetchTemplates(); }}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: `2px solid ${bcMode==='template'?'#818cf8':'#334155'}`, background: bcMode==='template'?'rgba(129,140,248,0.1)':'#1e293b', color: bcMode==='template'?'#818cf8':'#64748b', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  📋 Approved Template
+                </button>
+              </div>
+            )}
 
             {!bcResult ? (
               <div style={{ background: '#1e293b', borderRadius: 14, padding: 24, border: '1px solid #334155' }}>
+                {/* Numbers */}
                 <div style={{ marginBottom: 14 }}>
                   <label style={lbl}>Phone Numbers <span style={{ color: '#475569', textTransform: 'none', fontWeight: 400 }}>(ek line mein ek, country code ke saath)</span></label>
-                  <textarea
-                    style={{ ...inp, resize: 'vertical', fontFamily: 'monospace', fontSize: 13 }}
-                    rows={6}
-                    value={bcNumbers}
-                    onChange={e => setBcNumbers(e.target.value)}
-                    placeholder={'919876543210\n918765432109\n917654321098'}
-                  />
+                  <textarea style={{ ...inp, resize: 'vertical', fontFamily: 'monospace', fontSize: 13 }} rows={5}
+                    value={bcNumbers} onChange={e => setBcNumbers(e.target.value)}
+                    placeholder={'919876543210\n918765432109\n917654321098'} />
                   <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
                     {bcNumbers.split('\n').filter(n => n.trim().replace(/\D/g,'').length >= 10).length} valid numbers
                   </div>
                 </div>
-                <div style={{ marginBottom: 16 }}>
-                  <label style={lbl}>Message</label>
-                  <textarea
-                    style={{ ...inp, resize: 'vertical' }}
-                    rows={4}
-                    value={bcMessage}
-                    onChange={e => setBcMessage(e.target.value)}
-                    placeholder="Yahan apna message likho..."
-                  />
-                </div>
-                <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#f59e0b', marginBottom: 16 }}>
-                  ⚠️ Sirf un numbers pe kaam karega jinse 24 ghante mein baat hui ho, ya WhatsApp connected ho.
-                </div>
-                <button
-                  disabled={bcSending || !bcMessage.trim() || !bcNumbers.trim()}
-                  onClick={async () => {
-                    const nums = bcNumbers.split('\n').map(n => n.trim().replace(/\D/g,'')).filter(n => n.length >= 10);
-                    if (!nums.length) return;
-                    setBcSending(true);
-                    try {
-                      const r = await clientApi.bulkSend(nums, bcMessage.trim());
-                      setBcResult(r.data);
-                    } catch(e) { setBcResult({ error: e.response?.data?.error || e.message }); }
-                    setBcSending(false);
-                  }}
-                  style={{ background: bcSending || !bcMessage.trim() || !bcNumbers.trim() ? '#334155' : '#f59e0b', border: 'none', borderRadius: 10, padding: '12px 24px', fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {bcSending ? 'Bhej raha...' : `📢 ${bcNumbers.split('\n').filter(n=>n.trim().replace(/\D/g,'').length>=10).length} numbers ko bhejo`}
-                </button>
+
+                {/* Free Text Mode */}
+                {bcMode === 'text' && (
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={lbl}>Message</label>
+                      <textarea style={{ ...inp, resize: 'vertical' }} rows={4} value={bcMessage} onChange={e => setBcMessage(e.target.value)} placeholder="Yahan apna message likho..." />
+                    </div>
+                    <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#f59e0b', marginBottom: 16 }}>
+                      ⚠️ Sirf un numbers pe kaam karega jinse 24 ghante mein baat hui ho.
+                    </div>
+                    <button disabled={bcSending || !bcMessage.trim() || !bcNumbers.trim()}
+                      onClick={async () => {
+                        const nums = bcNumbers.split('\n').map(n => n.trim().replace(/\D/g,'')).filter(n => n.length >= 10);
+                        if (!nums.length) return;
+                        setBcSending(true);
+                        try { const r = await clientApi.bulkSend(nums, bcMessage.trim()); setBcResult(r.data); }
+                        catch(e) { setBcResult({ error: e.response?.data?.error || e.message }); }
+                        setBcSending(false);
+                      }}
+                      style={{ background: bcSending || !bcMessage.trim() || !bcNumbers.trim() ? '#334155' : '#f59e0b', border: 'none', borderRadius: 10, padding: '12px 24px', fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {bcSending ? 'Bhej raha...' : `📢 ${bcNumbers.split('\n').filter(n=>n.trim().replace(/\D/g,'').length>=10).length} numbers ko bhejo`}
+                    </button>
+                  </>
+                )}
+
+                {/* Template Mode */}
+                {bcMode === 'template' && (
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={lbl}>Template Select Karo</label>
+                      {templatesLoading && <div style={{ color: '#64748b', fontSize: 13, padding: '10px 0' }}>Loading templates...</div>}
+                      {templatesError && <div style={{ color: '#f87171', fontSize: 12, marginBottom: 8 }}>⚠️ {templatesError}</div>}
+                      {!templatesLoading && templates.length === 0 && (
+                        <div style={{ color: '#475569', fontSize: 13, padding: '10px 0' }}>
+                          Koi template nahi — WA Setup mein WABA ID save karo aur Templates Refresh karo.
+                        </div>
+                      )}
+                      {templates.filter(t => t.status === 'APPROVED').map((t, i) => {
+                        const bodyComp = t.components?.find(c => c.type === 'BODY');
+                        const varMatches = bodyComp?.text?.match(/\{\{(\d+)\}\}/g) || [];
+                        const selected = selTemplate?.name === t.name;
+                        return (
+                          <div key={i} onClick={() => { setSelTemplate(t); setBodyVars(Array(varMatches.length).fill('')); }}
+                            style={{ background: selected ? 'rgba(129,140,248,0.1)' : '#0f172a', border: `1.5px solid ${selected ? '#818cf8' : '#334155'}`, borderRadius: 10, padding: '10px 14px', marginBottom: 8, cursor: 'pointer' }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: selected ? '#818cf8' : '#e2e8f0' }}>{t.name}</div>
+                            <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>{t.language} {varMatches.length > 0 && `· ${varMatches.length} variable(s)`}</div>
+                            {bodyComp?.text && <div style={{ fontSize: 12, color: '#64748b', marginTop: 4, fontStyle: 'italic' }}>"{bodyComp.text.slice(0, 80)}{bodyComp.text.length > 80 ? '...' : ''}"</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Variable inputs */}
+                    {selTemplate && bodyVars.length > 0 && (
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={lbl}>Template Variables</label>
+                        {bodyVars.map((v, i) => (
+                          <div key={i} style={{ marginBottom: 8 }}>
+                            <input style={{ ...inp }} value={v}
+                              onChange={e => { const arr = [...bodyVars]; arr[i] = e.target.value; setBodyVars(arr); }}
+                              placeholder={`{{${i+1}}} — Variable ${i+1}`} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#818cf8', marginBottom: 16 }}>
+                      ✅ Template broadcast kisi bhi number pe bhej sakte ho — 24 ghante ki limit nahi.
+                    </div>
+                    <button disabled={bcSending || !selTemplate || !bcNumbers.trim()}
+                      onClick={async () => {
+                        const nums = bcNumbers.split('\n').map(n => n.trim().replace(/\D/g,'')).filter(n => n.length >= 10);
+                        if (!nums.length || !selTemplate) return;
+                        setBcSending(true);
+                        try {
+                          const r = await clientApi.templateBroadcast(nums, selTemplate.name, selTemplate.language, bodyVars.filter(v => v.trim()));
+                          setBcResult(r.data);
+                        } catch(e) { setBcResult({ error: e.response?.data?.error || e.message }); }
+                        setBcSending(false);
+                      }}
+                      style={{ background: bcSending || !selTemplate || !bcNumbers.trim() ? '#334155' : '#818cf8', border: 'none', borderRadius: 10, padding: '12px 24px', fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {bcSending ? 'Bhej raha...' : `📋 ${bcNumbers.split('\n').filter(n=>n.trim().replace(/\D/g,'').length>=10).length} numbers ko template bhejo`}
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div style={{ background: '#1e293b', borderRadius: 14, padding: 32, border: '1px solid #334155', textAlign: 'center' }}>
@@ -656,7 +741,7 @@ export default function ClientPortal({ onLogout }) {
                     </div>
                   </>
                 )}
-                <button onClick={() => { setBcResult(null); setBcNumbers(''); setBcMessage(''); }}
+                <button onClick={() => { setBcResult(null); setBcNumbers(''); setBcMessage(''); setSelTemplate(null); setBodyVars([]); }}
                   style={{ background: '#334155', border: 'none', borderRadius: 9, padding: '10px 20px', fontSize: 13, fontWeight: 700, color: '#94a3b8', cursor: 'pointer', fontFamily: 'inherit' }}>
                   Naya Broadcast
                 </button>
@@ -767,10 +852,17 @@ export default function ClientPortal({ onLogout }) {
                 {metaConfig.hasAccessToken && <div style={{ fontSize: 11, color: '#25d366', marginTop: 4 }}>✅ Token set hai</div>}
               </div>
 
-              <div style={{ marginBottom: 18 }}>
-                <label style={lbl}>Webhook Verify Token</label>
-                <input style={inp} value={metaForm.metaVerifyToken} onChange={e => setMetaForm(f => ({ ...f, metaVerifyToken: e.target.value }))} placeholder="koi bhi secret string, e.g. mybot_verify_123" />
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>Meta webhook setup mein yahi daalna hoga</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
+                <div>
+                  <label style={lbl}>Webhook Verify Token</label>
+                  <input style={inp} value={metaForm.metaVerifyToken} onChange={e => setMetaForm(f => ({ ...f, metaVerifyToken: e.target.value }))} placeholder="mybot_verify_123" />
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>Meta webhook setup mein yahi daalna hoga</div>
+                </div>
+                <div>
+                  <label style={lbl}>WABA ID (Templates ke liye)</label>
+                  <input style={inp} value={metaForm.metaWabaId} onChange={e => setMetaForm(f => ({ ...f, metaWabaId: e.target.value }))} placeholder="1234567890123456" />
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>Business Manager → Settings → Business Info</div>
+                </div>
               </div>
 
               <button onClick={handleSaveMeta} disabled={metaSaving} style={{ background: metaSaving ? '#1a4731' : '#25d366', border: 'none', borderRadius: 10, padding: '11px 24px', fontSize: 13, fontWeight: 700, color: '#fff', cursor: metaSaving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
@@ -779,7 +871,7 @@ export default function ClientPortal({ onLogout }) {
             </div>
 
             {/* Test Message */}
-            <div style={{ background: '#1e293b', borderRadius: 14, padding: 20, border: '1px solid #334155' }}>
+            <div style={{ background: '#1e293b', borderRadius: 14, padding: 20, border: '1px solid #334155', marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 6 }}>Test Message Bhejo</div>
               <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Credentials save karne ke baad yahan se test karo</div>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -787,6 +879,46 @@ export default function ClientPortal({ onLogout }) {
                 <button onClick={handleTestMeta} disabled={metaTesting} style={{ background: metaTesting ? '#0f172a' : '#0f2d1f', border: '1.5px solid #25d366', borderRadius: 10, padding: '11px 18px', fontSize: 13, fontWeight: 700, color: '#25d366', cursor: metaTesting ? 'not-allowed' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                   {metaTesting ? 'Bhej raha...' : 'Test Bhejo'}
                 </button>
+              </div>
+            </div>
+
+            {/* Templates */}
+            <div style={{ background: '#1e293b', borderRadius: 14, padding: 20, border: '1px solid #334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>📋 Message Templates</div>
+                <button onClick={fetchTemplates} disabled={templatesLoading} style={{ background: '#334155', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700, color: '#94a3b8', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {templatesLoading ? 'Loading...' : '🔄 Refresh'}
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Meta pe approved templates yahan dikhenge — Broadcast mein use kar sakte ho</div>
+              {templatesError && <div style={{ color: '#f87171', fontSize: 12, marginBottom: 10 }}>⚠️ {templatesError}</div>}
+              {templates.length === 0 && !templatesLoading && (
+                <div style={{ color: '#475569', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
+                  WABA ID save karo phir Refresh karo
+                </div>
+              )}
+              {templates.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {templates.map((t, i) => {
+                    const statusColor = t.status === 'APPROVED' ? '#25d366' : t.status === 'REJECTED' ? '#f87171' : '#f59e0b';
+                    const bodyComp = t.components?.find(c => c.type === 'BODY');
+                    const varCount = (bodyComp?.text?.match(/\{\{(\d+)\}\}/g) || []).length;
+                    return (
+                      <div key={i} style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 2 }}>{t.name}</div>
+                          <div style={{ fontSize: 11, color: '#475569' }}>{t.language} {varCount > 0 && `· ${varCount} variable${varCount>1?'s':''}`}</div>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: statusColor, background: `${statusColor}18`, border: `1px solid ${statusColor}40`, borderRadius: 99, padding: '3px 10px', whiteSpace: 'nowrap' }}>
+                          {t.status}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{ marginTop: 12, fontSize: 11, color: '#334155' }}>
+                Naya template banana ho → <a href="https://business.facebook.com" target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa' }}>business.facebook.com</a> → WhatsApp Manager → Message Templates
               </div>
             </div>
           </div>
