@@ -62,6 +62,11 @@ export default function ClientPortal({ onLogout }) {
   const [togglingBot, setTogglingBot] = useState(false);
   const chatEndRef = useRef(null);
   const inboxPollRef = useRef(null);
+  // Broadcast state
+  const [bcNumbers, setBcNumbers] = useState('');
+  const [bcMessage, setBcMessage] = useState('');
+  const [bcSending, setBcSending] = useState(false);
+  const [bcResult, setBcResult] = useState(null);
 
   useEffect(() => { fetchMe(); }, []);
 
@@ -243,7 +248,8 @@ export default function ClientPortal({ onLogout }) {
     { key: 'logs',   label: 'Chats',          show: !!p.viewLogs },
     { key: 'report', label: 'Report',         show: !!p.viewReportPreview || !!p.sendReport },
     { key: 'prompt', label: 'Prompt',         show: !!p.editPrompt },
-    { key: 'meta',   label: 'WA Setup',       show: true },
+    { key: 'meta',      label: 'WA Setup',    show: true },
+    { key: 'broadcast', label: '📢 Broadcast', show: true },
   ].filter(t => t.show);
 
   // Inbox helpers
@@ -575,6 +581,85 @@ export default function ClientPortal({ onLogout }) {
                     <button onClick={()=>{setShowNewChat(false);setNewPhone('');setNewText('');}} style={{ background:'#334155', border:'none', borderRadius:8, padding:'12px 16px', fontSize:13, fontWeight:700, color:'#94a3b8', cursor:'pointer' }}>Cancel</button>
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* BROADCAST */}
+        {activeTab === 'broadcast' && (
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>📢 Broadcast</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>Ek saath kai customers ko message bhejo</div>
+
+            {!bcResult ? (
+              <div style={{ background: '#1e293b', borderRadius: 14, padding: 24, border: '1px solid #334155' }}>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={lbl}>Phone Numbers <span style={{ color: '#475569', textTransform: 'none', fontWeight: 400 }}>(ek line mein ek, country code ke saath)</span></label>
+                  <textarea
+                    style={{ ...inp, resize: 'vertical', fontFamily: 'monospace', fontSize: 13 }}
+                    rows={6}
+                    value={bcNumbers}
+                    onChange={e => setBcNumbers(e.target.value)}
+                    placeholder={'919876543210\n918765432109\n917654321098'}
+                  />
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
+                    {bcNumbers.split('\n').filter(n => n.trim().replace(/\D/g,'').length >= 10).length} valid numbers
+                  </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={lbl}>Message</label>
+                  <textarea
+                    style={{ ...inp, resize: 'vertical' }}
+                    rows={4}
+                    value={bcMessage}
+                    onChange={e => setBcMessage(e.target.value)}
+                    placeholder="Yahan apna message likho..."
+                  />
+                </div>
+                <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#f59e0b', marginBottom: 16 }}>
+                  ⚠️ Sirf un numbers pe kaam karega jinse 24 ghante mein baat hui ho, ya WhatsApp connected ho.
+                </div>
+                <button
+                  disabled={bcSending || !bcMessage.trim() || !bcNumbers.trim()}
+                  onClick={async () => {
+                    const nums = bcNumbers.split('\n').map(n => n.trim().replace(/\D/g,'')).filter(n => n.length >= 10);
+                    if (!nums.length) return;
+                    setBcSending(true);
+                    try {
+                      const r = await clientApi.bulkSend(nums, bcMessage.trim());
+                      setBcResult(r.data);
+                    } catch(e) { setBcResult({ error: e.response?.data?.error || e.message }); }
+                    setBcSending(false);
+                  }}
+                  style={{ background: bcSending || !bcMessage.trim() || !bcNumbers.trim() ? '#334155' : '#f59e0b', border: 'none', borderRadius: 10, padding: '12px 24px', fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {bcSending ? 'Bhej raha...' : `📢 ${bcNumbers.split('\n').filter(n=>n.trim().replace(/\D/g,'').length>=10).length} numbers ko bhejo`}
+                </button>
+              </div>
+            ) : (
+              <div style={{ background: '#1e293b', borderRadius: 14, padding: 32, border: '1px solid #334155', textAlign: 'center' }}>
+                {bcResult.error ? (
+                  <div style={{ color: '#f87171', marginBottom: 20 }}>❌ Error: {bcResult.error}</div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>Broadcast Complete!</div>
+                    <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 24 }}>
+                      <div style={{ background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', borderRadius: 12, padding: '14px 28px' }}>
+                        <div style={{ fontSize: 28, fontWeight: 800, color: '#25d366' }}>{bcResult.sent}</div>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>Sent</div>
+                      </div>
+                      <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 12, padding: '14px 28px' }}>
+                        <div style={{ fontSize: 28, fontWeight: 800, color: '#f87171' }}>{bcResult.failed}</div>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>Failed</div>
+                      </div>
+                    </div>
+                  </>
+                )}
+                <button onClick={() => { setBcResult(null); setBcNumbers(''); setBcMessage(''); }}
+                  style={{ background: '#334155', border: 'none', borderRadius: 9, padding: '10px 20px', fontSize: 13, fontWeight: 700, color: '#94a3b8', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Naya Broadcast
+                </button>
               </div>
             )}
           </div>

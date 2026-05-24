@@ -249,4 +249,24 @@ router.post('/meta-test', async (req, res) => {
   }
 });
 
+// POST /client/bulk-send
+router.post('/bulk-send', async (req, res) => {
+  const c = req.clientData;
+  const { numbers, message } = req.body;
+  if (!numbers || !Array.isArray(numbers) || !numbers.length) return res.status(400).json({ error: 'Numbers required' });
+  if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
+  const { sendMessage } = require('../services/wa-sessions');
+  const results = { sent: 0, failed: 0, errors: [] };
+  for (const num of numbers) {
+    const clean = String(num).replace(/\D/g, '');
+    if (!clean || clean.length < 10) { results.failed++; continue; }
+    try {
+      await sendMessage(c.id, clean, message.trim());
+      results.sent++;
+    } catch (e) { results.failed++; results.errors.push({ number: clean, error: e.message }); }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  res.json({ success: true, ...results });
+});
+
 module.exports = router;
