@@ -6,7 +6,6 @@ async function transcribeAudio(audioBuffer, apiKey) {
   form.append('file', audioBuffer, { filename: 'audio.ogg', contentType: 'audio/ogg' });
   form.append('model', 'whisper-large-v3-turbo');
   form.append('response_format', 'text');
-  form.append('language', 'hi');
 
   const res = await axios.post(
     'https://api.groq.com/openai/v1/audio/transcriptions',

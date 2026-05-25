@@ -152,7 +152,7 @@ async function callGroq(apiKey, systemPrompt, messages, imageData = null) {
     return { role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content };
   });
 
-  const model = imageData ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
+  const model = imageData ? 'llama-3.2-90b-vision-preview' : 'llama-3.3-70b-versatile';
   const res = await axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
     {

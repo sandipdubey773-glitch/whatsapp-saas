@@ -960,7 +960,7 @@ async function handleIncoming(msg, clientId) {
     console.log(`[WA:${clientId}] Audio message from`, senderPhone);
     try {
       const s = sessions.get(clientId);
-      const buffer = await downloadMediaMessage(msg, 'buffer', {}, { reuploadRequest: s?.sock?.updateMediaMessage });
+      const buffer = await downloadMediaMessage(msg, 'buffer', {}, {});
       if (client.aiProvider === 'groq' && client.aiKey) {
         const transcribed = await whisper.transcribeAudio(buffer, client.aiKey);
         if (transcribed.trim()) {
@@ -984,7 +984,7 @@ async function handleIncoming(msg, clientId) {
     console.log(`[WA:${clientId}] Image from`, senderPhone);
     try {
       const s = sessions.get(clientId);
-      const buffer = await downloadMediaMessage(msg, 'buffer', {}, { reuploadRequest: s?.sock?.updateMediaMessage });
+      const buffer = await downloadMediaMessage(msg, 'buffer', {}, {});
       const mimeType = msg.message.imageMessage.mimetype || 'image/jpeg';
       const base64 = buffer.toString('base64');
       const caption = text.trim() || 'Is image mein kya problem hai? Diagnose karein aur batayein.';
