@@ -189,6 +189,9 @@ permissions: {
   businessClosedMessage,  // Message sent when shop is closed
   typingDelayEnabled,     // true = 2s typing indicator before reply
   autoApproveActions,     // string[] — action types that skip HAAN/NAHI (e.g. ['followup'])
+  workshopGroup,          // WhatsApp group ID for workshop stock management
+  showroomGroup,          // WhatsApp group ID for showroom stock management
+  stockSheetWebhook,      // Google Sheet webhook for stock transactions
   createdAt,              // ISO timestamp
 }
 ```
@@ -472,6 +475,37 @@ GET    /client/report-preview            — { report }
 POST   /client/send-report               — Send report to leadGroup
 POST   /client/toggle                    — Toggle bot status
 ```
+
+---
+
+## Stock Management
+Per-client inventory system — 2 locations: `workshop` aur `showroom`.
+
+**2 Ways to manage stock:**
+
+**1. Owner Trainer (WhatsApp se):**
+```
+Owner: "workshop mein 10 engine oil add karo"  → [STOCK_IN:workshop|Engine Oil|10|Owner]
+Owner: "showroom se 1 FZ-S bika"               → [STOCK_OUT:showroom|FZ-S|1|Owner]
+Owner: "stock batao"                            → current stock table
+```
+
+**2. Group Chat (staff directly):**
+- `workshopGroup` aur `showroomGroup` — WhatsApp group IDs (client config mein)
+- Staff directly group mein message kare:
+```
+IN | Part Name | Qty | Staff Name
+OUT | Part Name | Qty | Staff Name
+STOCK  (current stock dekhne ke liye)
+```
+
+**DB Collections:**
+- `stock` — `{ id, clientId, partName, qty, location, updatedAt }`
+- `stockTransactions` — `{ id, clientId, type(IN/OUT), partName, qty, staffName, location, timestamp }`
+
+**Google Sheet logging:** `client.stockSheetWebhook` pe har transaction fire hoti hai.
+
+**Alerts:** Jab stock 0 ho jaye → owner ko `🚨 STOCK KHATAM!` alert.
 
 ---
 
