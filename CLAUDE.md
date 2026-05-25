@@ -593,6 +593,28 @@ cd .. && git add -A && git commit -m "message" && git push origin main
 
 ---
 
+## Feature Availability — Sabhi Clients
+Ye sab features **code mein hain, client config mein nahi** — isliye purane aur naye sab clients pe automatically active hain. Alag se koi setup nahi chahiye.
+
+| Feature | Sabhi Clients? | Exception / Condition |
+|---------|---------------|----------------------|
+| Owner Training (rules, campaign, leads, stock) | ✅ Sab | — |
+| Agentic AI (HAAN/NAHI permission) | ✅ Sab | — |
+| Image Reading (vision AI) | ✅ Sab Baileys clients | Meta API clients ke liye nahi |
+| Voice Transcription (Whisper) | ✅ Sirf Groq provider clients | Gemini/OpenAI clients ko "please type" milega |
+| Appointment Calendar | ✅ Sab | Owner ko training mein rule dena hoga |
+| Sentiment Alert | ✅ Sab | — |
+| Stock Management | ✅ Sab | workshopGroup/showroomGroup set karni hogi group chat ke liye |
+| Lead Capture | ✅ Sab | System prompt mein `[LEAD_READY:]` marker hona chahiye |
+| Business Hours | ✅ Sab | `businessHoursEnabled: true` set karna hoga |
+| Typing Delay | ✅ Sab Baileys clients | `typingDelayEnabled: true` set karna hoga |
+| Broadcast | ✅ Sab | Meta API ke liye template approval chahiye |
+
+**Trainer limitation response:** Agar owner koi aisa kaam maange jo system support nahi karta, bot bolega:
+*"Sir, yeh kaam main abhi nahi kar sakta. Iske liye Sandeep sir (developer) se request karein — woh mujhe update kar denge. 🙏"*
+
+---
+
 ## Known Limitations
 - Single Baileys session per client (one WA number via Baileys — recommend Meta API for new clients)
 - Group messaging not supported via Meta API (Baileys only)
