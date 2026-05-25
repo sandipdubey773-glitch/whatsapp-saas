@@ -186,9 +186,13 @@ async function handleOwnerChat(client, senderPhone, userText) {
     const pending = _db.get('pendingActions').filter({ clientId: client.id, status: 'pending' }).value();
     if (pending.length > 0) {
       const action = pending[pending.length - 1];
-      await executeAgentAction(client, action);
-      _db.get('pendingActions').find({ id: action.id }).assign({ status: 'done' }).write();
-      await sendMessage(client.id, senderPhone, `✅ Done! *${action.type}* action execute ho gaya.`);
+      try {
+        await executeAgentAction(client, action);
+        await sendMessage(client.id, senderPhone, `✅ Done! *${action.type}* action execute ho gaya.`);
+      } catch (e) {
+        _db.get('pendingActions').find({ id: action.id }).assign({ status: 'failed' }).write();
+        await sendMessage(client.id, senderPhone, `❌ Action execute nahi hua: ${e.message}`);
+      }
       return;
     }
   }
@@ -303,11 +307,12 @@ AUTO-APPROVE RULES:
     else db.get('conversations').push(convData).write();
 
     let cleanReply = aiReply;
+    const freshClient = () => _db.get('clients').find({ id: client.id }).value();
 
     const campaignMatch2 = aiReply.match(/\[UPDATE_CAMPAIGN:([\s\S]*?)\]/);
     if (campaignMatch2) {
       const newCampaign = campaignMatch2[1].trim();
-      let prompt = client.systemPrompt.replace(/\n\n═+\nCURRENT CAMPAIGN[\s\S]*?(?=\n\n═|$)/g, '').trim();
+      let prompt = freshClient().systemPrompt.replace(/\n\n═+\nCURRENT CAMPAIGN[\s\S]*?(?=\n\n═|$)/g, '').trim();
       prompt += `\n\n═══════════════════════════════════\nCURRENT CAMPAIGN (YAD RAKHO)\n═══════════════════════════════════\n${newCampaign}\n\nCustomer isi campaign se aa raha hai — yeh context hamesha use karo.`;
       db.get('clients').find({ id: client.id }).assign({ systemPrompt: prompt }).write();
       cleanReply = cleanReply.replace(/\[UPDATE_CAMPAIGN:[\s\S]*?\]/g, '').trim();
@@ -316,7 +321,7 @@ AUTO-APPROVE RULES:
     const ruleMatch = aiReply.match(/\[ADD_RULE:([\s\S]*?)\]/);
     if (ruleMatch) {
       const newRule = ruleMatch[1].trim();
-      const prompt = client.systemPrompt + `\n\n[OWNER RULE]: ${newRule}`;
+      const prompt = freshClient().systemPrompt + `\n\n[OWNER RULE]: ${newRule}`;
       db.get('clients').find({ id: client.id }).assign({ systemPrompt: prompt }).write();
       cleanReply = cleanReply.replace(/\[ADD_RULE:[\s\S]*?\]/g, '').trim();
       cleanReply += `\n\n✅ *Rule save ho gaya!* Bot ab hamesha isko follow karega.`;
@@ -325,7 +330,7 @@ AUTO-APPROVE RULES:
     const removeRuleMatch = aiReply.match(/\[REMOVE_RULE:([^\]]+)\]/);
     if (removeRuleMatch) {
       const keyword = removeRuleMatch[1].trim().toLowerCase();
-      const lines = client.systemPrompt.split('\n');
+      const lines = freshClient().systemPrompt.split('\n');
       const filtered = lines.filter(line => !(line.startsWith('[OWNER RULE]:') && line.toLowerCase().includes(keyword)));
       const newPrompt = filtered.join('\n').trim();
       _db.get('clients').find({ id: client.id }).assign({ systemPrompt: newPrompt }).write();
@@ -335,7 +340,7 @@ AUTO-APPROVE RULES:
 
     if (aiReply.includes('[LIST_RULES]')) {
       cleanReply = cleanReply.replace(/\[LIST_RULES\]/g, '').trim();
-      const savedRules = client.systemPrompt.split('\n').filter(l => l.startsWith('[OWNER RULE]:'));
+      const savedRules = freshClient().systemPrompt.split('\n').filter(l => l.startsWith('[OWNER RULE]:'));
       if (savedRules.length === 0) {
         cleanReply += `\n\n📋 Abhi koi saved rule nahi hai.`;
       } else {
@@ -640,19 +645,15 @@ async function handleMessage(client, senderPhone, userText) {
 
 // --- Execute agent action ---
 async function executeAgentAction(client, action) {
-  try {
-    if (action.type === 'followup') {
-      await sendMessage(client.id, action.customerPhone, action.description);
-    } else if (action.type === 'offer') {
-      await sendMessage(client.id, action.customerPhone, action.description);
-    } else if (action.type === 'appointment') {
-      await sendMessage(client.id, action.customerPhone, `✅ ${action.description}`);
-    }
-    if (_db) _db.get('pendingActions').find({ id: action.id }).assign({ status: 'done' }).write();
-    console.log('[Agent] Action executed:', action.type, action.id);
-  } catch (e) {
-    console.error('[Agent] Action execute error:', e.message);
+  if (action.type === 'followup') {
+    await sendMessage(client.id, action.customerPhone, action.description);
+  } else if (action.type === 'offer') {
+    await sendMessage(client.id, action.customerPhone, action.description);
+  } else if (action.type === 'appointment') {
+    await sendMessage(client.id, action.customerPhone, `✅ ${action.description}`);
   }
+  if (_db) _db.get('pendingActions').find({ id: action.id }).assign({ status: 'done' }).write();
+  console.log('[Agent] Action executed:', action.type, action.id);
 }
 
 // --- 5-min auto-lead sender ---
