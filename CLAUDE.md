@@ -64,7 +64,7 @@ Incoming WA message
 - lowdb v1: use `db.get('collection').find({ id: ... }).value()`
 - Field is `client.id` (NOT `client._id`)
 - Always call `.write()` after mutations
-- Collections: `clients`, `conversations`, `stock`, `stockTransactions`, `pendingActions`
+- Collections: `clients`, `conversations`, `stock`, `stockTransactions`, `pendingActions`, `appointments`
 - Re-fetch client after DB writes: `const fresh = _db.get('clients').find({ id: client.id }).value()`
 
 ### Sessions (in-memory, RAM)
@@ -89,9 +89,11 @@ routes/
 services/
   wa-sessions.js                — Core: Baileys + Meta routing + handleMessage + handleOwnerChat
                                    + Agentic AI + executeAgentAction + Owner Training markers
+                                   + Image reading + Voice transcription + Appointment + Sentiment
   meta-api.js                   — Meta API: sendMessage, parseIncoming, getTemplates, sendTemplate
   reporter.js                   — Daily report generator
-  ai.js                         — AI wrapper (Gemini/Groq/OpenAI/Claude/OpenRouter)
+  ai.js                         — AI wrapper (Gemini/Groq vision/OpenAI vision/Claude/OpenRouter)
+  whisper.js                    — Groq Whisper API — audio buffer → text transcription
   booking.js                    — Lead system (parseLead, handleLead, Firebase, cron)
   firebase-auth-state.js        — Baileys session persistence via Firebase
 
@@ -283,6 +285,8 @@ Owner sends messages from `ownerPhone` to bot number → `handleOwnerChat()` rou
 | `[GET_LEADS:YYYY-MM-DD]` | Fetches leads for that date from Firebase |
 | `[STOCK_IN:location\|PartName\|Qty\|Staff]` | Adds stock |
 | `[STOCK_OUT:location\|PartName\|Qty\|Staff]` | Removes stock |
+| `[GET_APPOINTMENTS:YYYY-MM-DD]` | Shows all booked appointments for that date |
+| `[CANCEL_APPOINTMENT:id]` | Cancels appointment by ID |
 
 ### How Rules Are Stored
 `[OWNER RULE]` lines are appended directly to `client.systemPrompt` in DB. They persist across server restarts. Customer bot always sees these rules because they're part of the system prompt.
@@ -301,7 +305,107 @@ Bot:   "🗑️ Rule hata diya! System prompt se remove ho gaya."
 
 Owner: "followup ke liye permission mat lena"
 Bot:   "✅ followup ke liye ab permission nahi lenge — auto hoga."
+
+Owner: "aaj ke appointments batao"
+Bot:   "📅 2026-05-25 ke Appointments (2):
+        1. 10:00 — Rahul — Bike service
+        2. 14:00 — Priya — Oil change"
+
+Owner: "kal ki bookings batao"
+Bot:   "📅 2026-05-26 ko koi appointment nahi hai."
 ```
+
+---
+
+## Image Reading (Baileys only)
+Customer bike/product ki photo bheje → AI automatically diagnose kare.
+
+**Flow:**
+1. Customer image bhejta hai (with or without caption)
+2. Baileys `downloadMediaMessage` se buffer download hota hai
+3. Base64 convert karke AI ko bheja jaata hai
+4. AI (Gemini/Groq vision/GPT-4o) image analyse karke reply karta hai
+
+**AI Vision Models:**
+- Gemini → `gemini-1.5-flash` (vision)
+- Groq → `meta-llama/llama-4-scout-17b-16e-instruct` (vision)
+- OpenAI → `gpt-4o` (vision)
+- Claude/OpenRouter → vision support nahi (text fallback)
+
+**Note:** Sirf Baileys clients ke liye. Meta API clients ke liye image support nahi (alag implementation chahiye).
+
+---
+
+## Voice Transcription (Baileys only)
+Customer voice note bheje → text mein convert → AI reply kare.
+
+**Flow:**
+1. Customer audio/PTT message bhejta hai
+2. `downloadMediaMessage` se OGG buffer download hota hai
+3. Groq Whisper API (`whisper-large-v3-turbo`) se text transcription hoti hai
+4. `[Voice]: transcribed text` as userText → `handleMessage()` call
+
+**Limitation:** Sirf Groq AI provider wale clients ke liye transcription hoti hai (Groq API key use hoti hai). Dusre providers ke liye: "Please text mein likhein" message.
+
+**File:** `services/whisper.js` — `transcribeAudio(buffer, groqApiKey)`
+
+---
+
+## Appointment Calendar
+Bot customer ke saath baat karke appointments book kar sakta hai.
+
+**Customer Bot Flow:**
+1. AI ko current day ke booked slots ka context milta hai (system mein inject hota hai)
+2. Jab customer appointment maange, AI `[BOOK_SLOT:date|time|naam|description]` generate karta hai
+3. System slot conflict check karta hai
+4. Free hai toh DB mein save + owner ko WhatsApp notification
+5. Conflict hai toh customer ko dusra time choose karne ko kehta hai
+
+**BOOK_SLOT Marker:**
+```
+[BOOK_SLOT:2026-05-25|10:00|Rahul|Bike service - chain issue]
+```
+
+**Important:** Bot appointments tab lega jab owner ne training mein rule diya ho. Example:
+```
+Owner: "bot ko rule de: jab customer service date maange toh naam, date aur time leke appointment book karo"
+```
+
+**appointments DB Schema:**
+```js
+{
+  id,            // timestamp string
+  clientId,
+  date,          // 'YYYY-MM-DD'
+  time,          // 'HH:MM'
+  customerPhone,
+  customerName,
+  description,
+  status,        // 'confirmed' | 'cancelled'
+  createdAt,
+}
+```
+
+**Owner Trainer Commands:**
+- `"aaj ke appointments batao"` → `[GET_APPOINTMENTS:2026-05-25]`
+- `"kal ki bookings"` → `[GET_APPOINTMENTS:2026-05-26]`
+- `"yeh appointment cancel karo: 1748123456789"` → `[CANCEL_APPOINTMENT:id]`
+
+---
+
+## Sentiment Alert
+Frustrated/angry customer detect hone pe owner ko turant WhatsApp alert.
+
+**Flow:**
+1. Customer frustrated lage toh AI `[SENTIMENT:negative|reason]` marker include karta hai
+2. System marker strip karta hai (customer ko nahi dikhta)
+3. Owner ko alert: `"⚠️ Frustrated Customer Alert — 919XXXXXXXXX — 'reason' — Jald reply karein!"`
+
+**Triggers (AI judge karta hai):**
+- Customer angry/upset ho
+- Complaint kare
+- Refund/cancel maange
+- Abusive language use kare
 
 ---
 
