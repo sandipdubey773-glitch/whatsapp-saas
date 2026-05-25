@@ -5,7 +5,7 @@ const path = require('path');
 const adapter = new FileSync(path.join(__dirname, 'data.json'));
 const db = low(adapter);
 
-db.defaults({ clients: [], conversations: [], stock: [], stockTransactions: [], pendingActions: [] }).write();
+db.defaults({ clients: [], conversations: [], stock: [], stockTransactions: [], pendingActions: [], appointments: [] }).write();
 
 // Auto-seed from env var (highest priority) or fallback to built-in default
 if (db.get('clients').size().value() === 0) {

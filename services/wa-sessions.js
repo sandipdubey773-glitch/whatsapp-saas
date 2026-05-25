@@ -1,4 +1,5 @@
-const { makeWASocket, DisconnectReason, fetchLatestBaileysVersion, Browsers } = require('@whiskeysockets/baileys');
+const { makeWASocket, DisconnectReason, fetchLatestBaileysVersion, Browsers, downloadMediaMessage } = require('@whiskeysockets/baileys');
+const whisper = require('./whisper');
 const pino = require('pino');
 const axios = require('axios');
 const { callAI } = require('./ai');
@@ -269,6 +270,8 @@ REPLY RULES:
   Note: [SEND_GROUP:...] ke andar owner ka exact message likho, koi extra text mat add karo
 - Agar owner kisi date ki leads maange (jaise "aaj ki leads", "kal ki leads", "15 may ki leads", "leads batao"): [GET_LEADS:YYYY-MM-DD]
   Note: Date ko YYYY-MM-DD format mein likho. "Aaj" = today, "Kal" = yesterday (wo jo guzar gaya), "Parso" = 2 din pehle
+- Agar owner appointments dekhna chahe (jaise "aaj ke appointments", "kal ki bookings"): [GET_APPOINTMENTS:YYYY-MM-DD]
+- Agar owner appointment cancel karna chahe: [CANCEL_APPOINTMENT:appointmentId]
 - Agar owner stock ke baare mein pooche (jaise "stock batao", "kitna stock hai", "kya khatam hai"): CURRENT STOCK section se seedha jawab de — koi marker nahi chahiye
 - Agar owner stock ADD kare (jaise "workshop mein 10 engine oil add karo", "showroom mein 2 FZ-S aaye"): [STOCK_IN:location|Part Name|Qty|Owner]
   Note: location = "workshop" ya "showroom". Part Name exact likho.
@@ -368,6 +371,32 @@ AUTO-APPROVE RULES:
         }).join('\n\n');
         const msg = `📋 *${date} ki Leads — ${dayLeads.length} total*\n📞 Called: ${calledC} | 💬 Feedback: ${feedbackC} | ❌ Baaki: ${pendingC}\n━━━━━━━━━━━━━━━━━━━━━\n\n${lines}`;
         await sendMessage(client.id, senderPhone, msg);
+      }
+    }
+
+    const getAptMatch = aiReply.match(/\[GET_APPOINTMENTS:(\d{4}-\d{2}-\d{2})\]/);
+    if (getAptMatch) {
+      cleanReply = cleanReply.replace(/\[GET_APPOINTMENTS:[^\]]+\]/g, '').trim();
+      const aptDate = getAptMatch[1];
+      const apts = _db.get('appointments').filter({ clientId: client.id, date: aptDate }).value().filter(a => a.status !== 'cancelled');
+      if (apts.length === 0) {
+        cleanReply += `\n\n📅 *${aptDate}* ko koi appointment nahi hai.`;
+      } else {
+        const lines = apts.map((a, i) => `${i + 1}. *${a.time}* — ${a.customerName} — ${a.description}\n   📞 ${a.customerPhone}`).join('\n\n');
+        cleanReply += `\n\n📅 *${aptDate} ke Appointments (${apts.length}):*\n${lines}`;
+      }
+    }
+
+    const cancelAptMatch = aiReply.match(/\[CANCEL_APPOINTMENT:([^\]]+)\]/);
+    if (cancelAptMatch) {
+      cleanReply = cleanReply.replace(/\[CANCEL_APPOINTMENT:[^\]]+\]/g, '').trim();
+      const aptId = cancelAptMatch[1].trim();
+      const apt = _db.get('appointments').find({ id: aptId, clientId: client.id }).value();
+      if (apt) {
+        _db.get('appointments').find({ id: aptId }).assign({ status: 'cancelled' }).write();
+        cleanReply += `\n\n🗑️ Appointment cancel kar diya: ${apt.customerName} — ${apt.date} ${apt.time}`;
+      } else {
+        cleanReply += `\n\n❌ Appointment ID nahi mila: ${aptId}`;
       }
     }
 
@@ -478,7 +507,7 @@ AUTO-APPROVE RULES:
 }
 
 // --- Customer chat ---
-async function handleMessage(client, senderPhone, userText) {
+async function handleMessage(client, senderPhone, userText, imageData = null) {
   if (!_db) return;
   try {
     const convId = `${client.id}_${senderPhone}`;
@@ -539,7 +568,15 @@ async function handleMessage(client, senderPhone, userText) {
     const tomorrowStr = tomorrowDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
     const dateContext = `\n\n[SYSTEM: Aaj ki date hai ${todayStr}. "Kal" matlab ${tomorrowStr}. Date hamesha YYYY-MM-DD format mein likho.]`;
     const autoApproved = (client.autoApproveActions || []).join(', ') || 'koi nahi';
-    const agentContext = `\n\n[SYSTEM: Agar tum koi action lena chahte ho (followup, offer, appointment), toh is format mein likho: [ACTION_REQUEST:type|description|params] — Example: [ACTION_REQUEST:followup|Rahul ko kal reminder bhejein ki service ka time aa gaya|] — Auto-approved actions (permission ki zaroorat nahi): ${autoApproved}]`;
+    const agentContext = `\n\n[SYSTEM: Agar tum koi action lena chahte ho (followup, offer, appointment), toh is format mein likho: [ACTION_REQUEST:type|description|params] — Auto-approved actions: ${autoApproved}
+Appointment book karne ke liye: [BOOK_SLOT:YYYY-MM-DD|HH:MM|CustomerName|Service Description]
+Agar customer frustrated/angry/upset lage: [SENTIMENT:negative|reason in 10 words]]`;
+
+    const todayApts = _db.get('appointments').filter({ clientId: client.id }).value()
+      .filter(a => a.date === todayStr && a.status !== 'cancelled');
+    const aptContext = todayApts.length > 0
+      ? `\n\n[SYSTEM: Aaj ke booked slots: ${todayApts.map(a => `${a.time}(${a.customerName})`).join(', ')}. Naya slot book karo is format mein: [BOOK_SLOT:date|time|naam|description]]`
+      : `\n\n[SYSTEM: Aaj koi appointment nahi hai. Slot book karne ke liye: [BOOK_SLOT:date|time|naam|description]]`;
     const alreadyCaptured = messages.some(m => m.role === 'assistant' && m.content.includes('[LEAD_READY:'));
     const noLeadInstruction = alreadyCaptured ? '\n\n[SYSTEM: Lead pehle hi capture ho chuka hai — LEAD_READY marker DOBARA MAT LIKHO.]' : '';
     const cleanCustomerPhone = senderPhone.replace(/\D/g, '');
@@ -553,8 +590,9 @@ async function handleMessage(client, senderPhone, userText) {
     const aiReply = await callAI({
       provider: client.aiProvider,
       apiKey: client.aiKey,
-      systemPrompt: client.systemPrompt + dateContext + noLeadInstruction + phoneContext + agentContext,
+      systemPrompt: client.systemPrompt + dateContext + noLeadInstruction + phoneContext + agentContext + aptContext,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
+      imageData,
     });
 
     messages.push({ role: 'assistant', content: aiReply, timestamp: new Date().toISOString() });
@@ -563,7 +601,12 @@ async function handleMessage(client, senderPhone, userText) {
     else _db.get('conversations').push(convData).write();
 
     const leadMarker = booking.parseLead(aiReply);
-    const cleanReply = aiReply.replace(/\[LEAD_READY:[^\]]+\]/g, '').trim();
+    let cleanReply = aiReply
+      .replace(/\[LEAD_READY:[^\]]+\]/g, '')
+      .replace(/\[BOOK_SLOT:[^\]]+\]/g, '')
+      .replace(/\[SENTIMENT:[^\]]+\]/g, '')
+      .replace(/\[ACTION_REQUEST:[^\]]+\]/g, '')
+      .trim();
 
     if (cleanReply) {
       if (client.typingDelayEnabled && sess?.sock && sess?.connected) {
@@ -597,6 +640,44 @@ async function handleMessage(client, senderPhone, userText) {
           }
         })
         .catch(e => console.error('[Booking] handleLead error:', e.message));
+    }
+
+    // --- Appointment Booking ---
+    const slotMatch = aiReply.match(/\[BOOK_SLOT:([^|]+)\|([^|]+)\|([^|]+)\|([^\]]*)\]/);
+    if (slotMatch) {
+      const [, aptDate, aptTime, aptNaam, aptDesc] = slotMatch;
+      const conflict = _db.get('appointments').filter({ clientId: client.id, date: aptDate.trim(), time: aptTime.trim(), status: 'confirmed' }).value();
+      if (conflict.length > 0) {
+        await sendMessage(client.id, senderPhone, `⚠️ Yeh slot (${aptDate.trim()} ${aptTime.trim()}) already booked hai. Doosra time choose karein.`);
+      } else {
+        _db.get('appointments').push({
+          id: Date.now().toString(),
+          clientId: client.id,
+          date: aptDate.trim(),
+          time: aptTime.trim(),
+          customerPhone: senderPhone,
+          customerName: aptNaam.trim(),
+          description: aptDesc.trim(),
+          status: 'confirmed',
+          createdAt: new Date().toISOString(),
+        }).write();
+        const ownerList = (client.ownerPhone || '').split(',').map(p => p.trim().replace(/\D/g, '')).filter(Boolean);
+        if (ownerList.length > 0) {
+          await sendMessage(client.id, ownerList[0], `📅 *New Appointment Booked*\n👤 ${aptNaam.trim()}\n📅 ${aptDate.trim()} at ${aptTime.trim()}\n📋 ${aptDesc.trim()}\n📞 ${senderPhone}`);
+        }
+        console.log('[Appointment] Booked:', aptNaam.trim(), aptDate.trim(), aptTime.trim());
+      }
+    }
+
+    // --- Sentiment Alert ---
+    const sentimentMatch = aiReply.match(/\[SENTIMENT:negative\|([^\]]+)\]/);
+    if (sentimentMatch) {
+      const reason = sentimentMatch[1].trim();
+      const ownerList = (client.ownerPhone || '').split(',').map(p => p.trim().replace(/\D/g, '')).filter(Boolean);
+      if (ownerList.length > 0) {
+        await sendMessage(client.id, ownerList[0], `⚠️ *Frustrated Customer Alert*\n📞 ${senderPhone}\n💬 "${reason}"\n\nJald reply karein!`);
+        console.log('[Sentiment] Alert sent for', senderPhone);
+      }
     }
 
     // --- Agentic Action Detection ---
@@ -812,10 +893,14 @@ async function handleIncoming(msg, clientId) {
     return;
   }
 
+  const hasImage = !!msg.message?.imageMessage;
+  const hasAudio = !!(msg.message?.audioMessage);
+
   const text = msg.message?.conversation ||
                msg.message?.extendedTextMessage?.text ||
                msg.message?.imageMessage?.caption || '';
-  if (!text.trim()) return;
+
+  if (!text.trim() && !hasImage && !hasAudio) return;
 
   let senderPhone = jid.replace('@s.whatsapp.net', '').replace('@c.us', '').replace('@lid', '');
   if (jid.endsWith('@s.whatsapp.net')) {
@@ -861,9 +946,53 @@ async function handleIncoming(msg, clientId) {
   if (isOwner) {
     console.log(`[WA:${clientId}] Owner message — trainer AI:`, text.slice(0, 40));
     await handleOwnerChat(client, senderPhone, text);
-  } else {
-    await handleMessage(client, senderPhone, text);
+    return;
   }
+
+  // --- Audio / Voice Note ---
+  if (hasAudio) {
+    console.log(`[WA:${clientId}] Audio message from`, senderPhone);
+    try {
+      const s = sessions.get(clientId);
+      const buffer = await downloadMediaMessage(msg, 'buffer', {}, { reuploadRequest: s?.sock?.updateMediaMessage });
+      if (client.aiProvider === 'groq' && client.aiKey) {
+        const transcribed = await whisper.transcribeAudio(buffer, client.aiKey);
+        if (transcribed.trim()) {
+          console.log(`[Whisper] Transcribed for ${senderPhone}:`, transcribed.slice(0, 60));
+          await handleMessage(client, senderPhone, `[Voice]: ${transcribed}`);
+        } else {
+          await handleMessage(client, senderPhone, '[Voice message aaya lekin samajh nahi aaya. Please text mein likhein.]');
+        }
+      } else {
+        await handleMessage(client, senderPhone, '[Voice message receive hua. Kripya apna sawaal text mein likhein.]');
+      }
+    } catch (e) {
+      console.error(`[WA] Audio processing error:`, e.message);
+      await handleMessage(client, senderPhone, '[Voice message receive hua. Kripya text mein likhein.]');
+    }
+    return;
+  }
+
+  // --- Image ---
+  if (hasImage) {
+    console.log(`[WA:${clientId}] Image from`, senderPhone);
+    try {
+      const s = sessions.get(clientId);
+      const buffer = await downloadMediaMessage(msg, 'buffer', {}, { reuploadRequest: s?.sock?.updateMediaMessage });
+      const mimeType = msg.message.imageMessage.mimetype || 'image/jpeg';
+      const base64 = buffer.toString('base64');
+      const caption = text.trim() || 'Is image mein kya problem hai? Diagnose karein aur batayein.';
+      await handleMessage(client, senderPhone, caption, { mimeType, data: base64 });
+    } catch (e) {
+      console.error(`[WA] Image processing error:`, e.message);
+      if (text.trim()) await handleMessage(client, senderPhone, text);
+      else await handleMessage(client, senderPhone, '[Image receive hui. Kripya problem describe karein.]');
+    }
+    return;
+  }
+
+  // --- Regular Text ---
+  await handleMessage(client, senderPhone, text);
 }
 
 // --- Boot a single client's Baileys session ---

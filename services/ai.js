@@ -8,10 +8,10 @@ async function callAI({ provider, apiKey, systemPrompt, messages, imageData = nu
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       if (provider === 'gemini') return await callGemini(apiKey, systemPrompt, messages, imageData);
-      if (provider === 'openai') return await callOpenAI(apiKey, systemPrompt, messages);
+      if (provider === 'openai') return await callOpenAI(apiKey, systemPrompt, messages, imageData);
       if (provider === 'claude') return await callClaude(apiKey, systemPrompt, messages);
       if (provider === 'openrouter') return await callOpenRouter(apiKey, systemPrompt, messages);
-      if (provider === 'groq') return await callGroq(apiKey, systemPrompt, messages);
+      if (provider === 'groq') return await callGroq(apiKey, systemPrompt, messages, imageData);
       throw new Error('Unknown AI provider: ' + provider);
     } catch (err) {
       const status = err.response?.status;
@@ -89,18 +89,30 @@ async function callClaude(apiKey, systemPrompt, messages) {
   return reply;
 }
 
-async function callOpenAI(apiKey, systemPrompt, messages) {
+async function callOpenAI(apiKey, systemPrompt, messages, imageData = null) {
+  const formattedMessages = messages.map((m, idx) => {
+    const isLast = idx === messages.length - 1;
+    if (isLast && m.role === 'user' && imageData) {
+      return {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${imageData.mimeType};base64,${imageData.data}` } },
+          { type: 'text', text: m.content || 'Is image mein kya problem hai?' },
+        ],
+      };
+    }
+    return { role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content };
+  });
+
+  const model = imageData ? 'gpt-4o' : 'gpt-4o-mini';
   const res = await axios.post(
     'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    },
+    { model, messages: [{ role: 'system', content: systemPrompt }, ...formattedMessages] },
     { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
   );
 
   const reply = res.data.choices?.[0]?.message?.content || '';
-  console.log('[AI] OpenAI reply length:', reply.length);
+  console.log('[AI] OpenAI reply length:', reply.length, imageData ? `(${model} vision)` : '');
   return reply;
 }
 
@@ -125,18 +137,33 @@ async function callOpenRouter(apiKey, systemPrompt, messages) {
   return reply;
 }
 
-async function callGroq(apiKey, systemPrompt, messages) {
+async function callGroq(apiKey, systemPrompt, messages, imageData = null) {
+  const formattedMessages = messages.map((m, idx) => {
+    const isLast = idx === messages.length - 1;
+    if (isLast && m.role === 'user' && imageData) {
+      return {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${imageData.mimeType};base64,${imageData.data}` } },
+          { type: 'text', text: m.content || 'Is image mein kya problem hai?' },
+        ],
+      };
+    }
+    return { role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content };
+  });
+
+  const model = imageData ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
   const res = await axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
     {
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'system', content: systemPrompt }, ...messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))],
+      model,
+      messages: [{ role: 'system', content: systemPrompt }, ...formattedMessages],
       max_tokens: 1024,
     },
     { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
   );
   const reply = res.data.choices?.[0]?.message?.content || '';
-  console.log('[AI] Groq reply length:', reply.length);
+  console.log('[AI] Groq reply length:', reply.length, imageData ? '(vision)' : '');
   return reply;
 }
 
