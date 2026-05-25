@@ -194,6 +194,9 @@ permissions: {
   showroomGroup,          // WhatsApp group ID for showroom stock management
   stockSheetWebhook,      // Google Sheet webhook for stock transactions
   createdAt,              // ISO timestamp
+  onboardingComplete,     // false = wizard pending | true = done | undefined = existing client (skip)
+  onboardingStep,         // 0-8 current step (null when done)
+  onboardingData,         // { botName, ownerName, businessName, businessType, city, workingHours, services, botJob, specialOffer }
 }
 ```
 
@@ -205,6 +208,11 @@ Every client needs exactly 2 numbers:
 - **Number 2 — Owner Number:** `ownerPhone` — receives lead reports, training chat, HAAN/NAHI prompts
 
 In AddClient form, entering Owner Number auto-fills `ownerPhone`, `reportPhone`, and `leadGroup`.
+
+**Demo System Prompt (AddClient.jsx):**
+- Naya client banate waqt system prompt field pre-filled hoti hai `DEMO_PROMPT` se (generic Hinglish template with `[LEAD_READY:]` marker)
+- **"Reset Template"** button — agar prompt change kar diya toh wapas DEMO_PROMPT pe
+- **"Copy Prompt"** button — current prompt clipboard pe copy
 
 ---
 
@@ -377,7 +385,7 @@ Customer bike/product ki photo bheje → AI automatically diagnose kare.
 
 **AI Vision Models:**
 - Gemini → `gemini-1.5-flash` (vision)
-- Groq → `meta-llama/llama-4-scout-17b-16e-instruct` (vision)
+- Groq → `llama-3.2-90b-vision-preview` (vision)
 - OpenAI → `gpt-4o` (vision)
 - Claude/OpenRouter → vision support nahi (text fallback)
 
