@@ -23,7 +23,8 @@ Multi-client WhatsApp bot SaaS. Admin ek dashboard se multiple clients manage ka
 - **Server log:** `server.log` in project root
 - **Frontend build:** `cd frontend && npm run build` → output goes to `../public/`
 - **Push:** `git add -A && git commit -m "message" && git push origin main`
-- **Restart server:** Kill node process → `node index.js > server.log 2>&1 &`
+- **Restart server:** Step 1 — PowerShell mein: `Stop-Process -Name node -Force -ErrorAction SilentlyContinue` → Step 2 — Bash mein: `node index.js > server.log 2>&1 &`
+- **Note:** `taskkill` se port 3000 EADDRINUSE error aa sakta hai — hamesha PowerShell `Stop-Process` use karo node kill karne ke liye
 
 ---
 
@@ -616,8 +617,11 @@ cd frontend && npm run build
 cd .. && git add -A && git commit -m "message" && git push origin main
 
 # 3. Restart server
-# Kill node: Stop-Process -Name node -Force (PowerShell)
-# Start: node index.js > server.log 2>&1 &
+# Step 1 — PowerShell mein (node kill karo):
+Stop-Process -Name node -Force -ErrorAction SilentlyContinue
+# Step 2 — Bash mein (server start karo):
+node index.js > server.log 2>&1 &
+# IMPORTANT: taskkill use mat karo — port 3000 EADDRINUSE error aata hai
 ```
 
 ---
