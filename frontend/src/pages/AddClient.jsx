@@ -144,22 +144,32 @@ export default function AddClient() {
               <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Business Manager → Settings → Business Info pe milega — templates ke liye zaroori</div>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
-            <div>
-              <label style={lbl}>Owner WhatsApp Number</label>
-              <input style={inp} value={form.ownerPhone} onChange={e => set('ownerPhone', e.target.value)} placeholder="9327363931" />
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Owner ko bot se seedha baat karne ki permission</div>
+        </div>
+
+        {/* 2 Numbers Setup */}
+        <div style={card}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 6 }}>📱 Do Numbers Setup</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 18 }}>Har client ke liye sirf 2 numbers chahiye</div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {/* Number 1 — Bot */}
+            <div style={{ background: '#0f172a', border: '1.5px solid #1e3a5f', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', marginBottom: 10 }}>📲 Number 1 — Bot Number</div>
+              <label style={lbl}>WhatsApp Number (Bot) 🔒</label>
+              <input style={inp} value={form.botPhone} onChange={e => set('botPhone', e.target.value)} placeholder="919876543210" />
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Customers is number pe message karenge — sirf yahi connect hoga</div>
             </div>
-            <div>
-              <label style={lbl}>Report WhatsApp Number (Lead Group)</label>
-              <input style={inp} value={form.leadGroup} onChange={e => set('leadGroup', e.target.value)} placeholder="9327363931" />
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Leads aur reports is number pe jayenge</div>
+
+            {/* Number 2 — Owner */}
+            <div style={{ background: '#0f172a', border: '1.5px solid #14532d', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#25d366', marginBottom: 10 }}>👤 Number 2 — Owner Number</div>
+              <label style={lbl}>Owner / Training Number</label>
+              <input style={inp} value={form.ownerPhone} onChange={e => {
+                const v = e.target.value;
+                setForm(f => ({ ...f, ownerPhone: v, reportPhone: v, leadGroup: v }));
+              }} placeholder="919054900960" />
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Bot training, leads aur daily report — sab yahan aayega</div>
             </div>
-          </div>
-          <div>
-            <label style={lbl}>Bot WhatsApp Number 🔒</label>
-            <input style={inp} value={form.botPhone} onChange={e => set('botPhone', e.target.value)} placeholder="919876543210 (country code ke saath)" />
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Client sirf yahi number connect kar sakta hai — koi aur number allow nahi hoga</div>
           </div>
         </div>
 
@@ -206,16 +216,9 @@ export default function AddClient() {
 
         {/* Report + Sheet */}
         <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 18 }}>📊 Report & Google Sheet</div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={lbl}>Report WhatsApp Number (Owner ko)</label>
-            <input style={inp} value={form.reportPhone} onChange={e => set('reportPhone', e.target.value)} placeholder="919876543210 (country code ke saath, no +)" />
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Roz raat 9 baje daily report is number pe aayegi</div>
-          </div>
-
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 18 }}>📊 Google Sheet (Optional)</div>
           <div>
-            <label style={lbl}>Google Sheet Webhook URL (Optional)</label>
+            <label style={lbl}>Google Sheet Webhook URL</label>
             <input style={inp} value={form.googleSheetWebhook} onChange={e => set('googleSheetWebhook', e.target.value)} placeholder="https://script.google.com/macros/s/xxx/exec" />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>Har conversation ka data automatically sheet mein save hoga</div>
           </div>
