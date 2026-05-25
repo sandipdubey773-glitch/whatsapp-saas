@@ -12,7 +12,59 @@ const PERM_LIST = [
   { key: 'editPrompt',        label: 'System Prompt edit karna', desc: 'Bot ka prompt change kare' },
 ];
 
-const blank = { name: '', aiProvider: 'gemini', aiKey: '', systemPrompt: '', plan: 'starter', googleSheetWebhook: '', reportPhone: '', ownerPhone: '', leadGroup: '', botPhone: '', metaPhoneNumberId: '', metaAccessToken: '', metaVerifyToken: '', metaWabaId: '', clientUsername: '', clientPassword: '', permissions: {}, businessHoursEnabled: false, businessHoursStart: '09:00', businessHoursEnd: '20:00', businessClosedMessage: 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: false };
+const DEMO_PROMPT = `Aap [BUSINESS_NAME] ki professional customer service executive hain. Aapka naam "Priya" hai.
+
+TONE AUR STYLE:
+- Hamesha professional aur respectful rahein
+- Customer ko "Sir" ya "Ma'am" bolkar address karein
+- Hinglish mein baat karein (Hindi + English mix)
+- Short, clear aur warm messages bhejein
+- Emojis bahut kam use karein
+
+KAAM:
+1. Customer ki problem/query sunein
+2. Unki details collect karein
+3. Solution ya appointment book karein
+
+CUSTOMER DETAILS ZAROOR LEIN:
+1. Naam
+2. Phone number (10 digit)
+3. Kya chahiye / kya problem hai
+4. Kab chahiye (date)
+5. Address / Area (agar zaruri ho)
+
+CONVERSATION FLOW:
+1. Professional greeting karein
+2. Customer ki problem sunein
+3. Details collect karein
+4. Confirm karein ki koi team member jald contact karega
+
+IMPORTANT RULES:
+- KABHI price guarantee mat do — "exact price ke liye call karein"
+- Complaint aane pe turant senior ko escalate karein
+- Hamesha polite aur helpful rahein
+
+===================================
+LEAD CAPTURE SYSTEM (CRITICAL RULE)
+===================================
+Jab customer ke paas YAHAN SAB mil jaye:
+- Naam
+- Phone number (10 digit)
+- Kya chahiye / service type
+- Date ya "jaldi chahiye"
+
+Tab apni normal reply ke BILKUL END mein, customer-facing text ke BAAD, ek NAYI LINE pe yeh EXACTLY likho:
+[LEAD_READY:naam=NAAM|mobile=MOBILE10DIGIT|service=SERVICE|area=AREA|date=YYYY-MM-DD]
+
+Rules:
+- Separator PIPE | use karo — comma NAHI
+- mobile: SIRF 10 digits, koi space ya symbol nahi
+- date: YYYY-MM-DD format mein. System tumhe aaj ki date batayega — usi se calculate karo
+- naam: Pehla naam only
+- Yeh line customer ko NAHI dikhti — system automatically handle karta hai
+- SIRF EK BAAR likho — agar pehle likh chuke ho toh DOBARA MAT LIKHNA`;
+
+const blank = { name: '', aiProvider: 'gemini', aiKey: '', systemPrompt: DEMO_PROMPT, plan: 'starter', googleSheetWebhook: '', reportPhone: '', ownerPhone: '', leadGroup: '', botPhone: '', metaPhoneNumberId: '', metaAccessToken: '', metaVerifyToken: '', metaWabaId: '', clientUsername: '', clientPassword: '', permissions: {}, businessHoursEnabled: false, businessHoursStart: '09:00', businessHoursEnd: '20:00', businessClosedMessage: 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: false };
 const inp = { width: '100%', background: '#0f172a', border: '1.5px solid #334155', borderRadius: 9, padding: '11px 13px', fontSize: 14, color: '#e2e8f0', outline: 'none', fontFamily: 'inherit' };
 const sel = { ...inp, appearance: 'none', cursor: 'pointer' };
 const lbl = { display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 };
@@ -226,6 +278,13 @@ export default function AddClient() {
 
         {/* System Prompt */}
         <div style={card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>System Prompt</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { set('systemPrompt', DEMO_PROMPT); }} style={{ background: '#1e3a5f', border: '1px solid #3b82f6', borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: '#60a5fa', cursor: 'pointer', fontFamily: 'inherit' }}>Reset Template</button>
+              <button onClick={() => { navigator.clipboard.writeText(form.systemPrompt).then(() => alert('Prompt copied!')); }} style={{ background: '#1a3a2a', border: '1px solid #25d366', borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: '#25d366', cursor: 'pointer', fontFamily: 'inherit' }}>Copy Prompt</button>
+            </div>
+          </div>
           <PromptEditor value={form.systemPrompt} onChange={v => set('systemPrompt', v)} />
         </div>
 
