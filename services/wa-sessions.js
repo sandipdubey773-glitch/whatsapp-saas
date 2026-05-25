@@ -179,6 +179,29 @@ async function sendToGroup(clientId, groupId, text) {
 
 // --- Owner trainer chat ---
 async function handleOwnerChat(client, senderPhone, userText) {
+
+  // HAAN / NAHI — pending action reply
+  const upperText = userText.trim().toUpperCase();
+  if (upperText === 'HAAN' || upperText.startsWith('HAAN ')) {
+    const pending = _db.get('pendingActions').filter({ clientId: client.id, status: 'pending' }).value();
+    if (pending.length > 0) {
+      const action = pending[pending.length - 1];
+      await executeAgentAction(client, action);
+      _db.get('pendingActions').find({ id: action.id }).assign({ status: 'done' }).write();
+      await sendMessage(client.id, senderPhone, `✅ Done! *${action.type}* action execute ho gaya.`);
+      return;
+    }
+  }
+  if (upperText === 'NAHI' || upperText.startsWith('NAHI ')) {
+    const pending = _db.get('pendingActions').filter({ clientId: client.id, status: 'pending' }).value();
+    if (pending.length > 0) {
+      const action = pending[pending.length - 1];
+      _db.get('pendingActions').find({ id: action.id }).assign({ status: 'cancelled' }).write();
+      await sendMessage(client.id, senderPhone, `❌ *${action.type}* action cancel kar diya.`);
+      return;
+    }
+  }
+
   const db = _db;
   const leads     = booking.getTodayBookings(client.id);
   const called    = leads.filter(l => l.called).length;
@@ -243,7 +266,14 @@ REPLY RULES:
 - Agar owner stock ADD kare (jaise "workshop mein 10 engine oil add karo", "showroom mein 2 FZ-S aaye"): [STOCK_IN:location|Part Name|Qty|Owner]
   Note: location = "workshop" ya "showroom". Part Name exact likho.
 - Agar owner stock NIKALE (jaise "workshop se 2 air filter gaya", "showroom se R15 1 bika"): [STOCK_OUT:location|Part Name|Qty|Owner]
-  Note: location = "workshop" ya "showroom". Part Name exact likho.`;
+  Note: location = "workshop" ya "showroom". Part Name exact likho.
+
+AUTO-APPROVE RULES:
+- Agar owner bole "X ke liye permission mat lena" ya "X automatically karo": [SET_AUTO_APPROVE:X]
+  Example: "followup ke liye permission mat lena" → [SET_AUTO_APPROVE:followup]
+- Agar owner bole "X ke liye permission lo" ya "X se pehle poocho": [REMOVE_AUTO_APPROVE:X]
+  Example: "offer se pehle poocho" → [REMOVE_AUTO_APPROVE:offer]
+- HAAN/NAHI replies system automatically handle karta hai — tum normal baat karo.`;
 
   try {
     const ownerConvId = `${client.id}_owner_chat`;
@@ -387,6 +417,26 @@ REPLY RULES:
       } catch (e) { console.error('[Owner] Group send error:', e.message); }
     }
 
+    // Auto-approve set/remove
+    const setAutoMatch = aiReply.match(/\[SET_AUTO_APPROVE:([^\]]+)\]/);
+    if (setAutoMatch) {
+      const actionType = setAutoMatch[1].trim();
+      const current = client.autoApproveActions || [];
+      if (!current.includes(actionType)) {
+        _db.get('clients').find({ id: client.id }).assign({ autoApproveActions: [...current, actionType] }).write();
+      }
+      cleanReply = cleanReply.replace(/\[SET_AUTO_APPROVE:[^\]]+\]/g, '').trim();
+      cleanReply += `\n✅ *${actionType}* ke liye ab permission nahi lenge — auto hoga.`;
+    }
+    const removeAutoMatch = aiReply.match(/\[REMOVE_AUTO_APPROVE:([^\]]+)\]/);
+    if (removeAutoMatch) {
+      const actionType = removeAutoMatch[1].trim();
+      const current = (client.autoApproveActions || []).filter(a => a !== actionType);
+      _db.get('clients').find({ id: client.id }).assign({ autoApproveActions: current }).write();
+      cleanReply = cleanReply.replace(/\[REMOVE_AUTO_APPROVE:[^\]]+\]/g, '').trim();
+      cleanReply += `\n🔔 *${actionType}* ke liye ab permission lenge.`;
+    }
+
     await sendMessage(client.id, senderPhone, cleanReply || aiReply);
     console.log('[Owner] Trainer AI replied to', senderPhone);
   } catch (err) {
@@ -456,6 +506,8 @@ async function handleMessage(client, senderPhone, userText) {
     const tomorrowDate = new Date(); tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrowStr = tomorrowDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
     const dateContext = `\n\n[SYSTEM: Aaj ki date hai ${todayStr}. "Kal" matlab ${tomorrowStr}. Date hamesha YYYY-MM-DD format mein likho.]`;
+    const autoApproved = (client.autoApproveActions || []).join(', ') || 'koi nahi';
+    const agentContext = `\n\n[SYSTEM: Agar tum koi action lena chahte ho (followup, offer, appointment), toh is format mein likho: [ACTION_REQUEST:type|description|params] — Example: [ACTION_REQUEST:followup|Rahul ko kal reminder bhejein ki service ka time aa gaya|] — Auto-approved actions (permission ki zaroorat nahi): ${autoApproved}]`;
     const alreadyCaptured = messages.some(m => m.role === 'assistant' && m.content.includes('[LEAD_READY:'));
     const noLeadInstruction = alreadyCaptured ? '\n\n[SYSTEM: Lead pehle hi capture ho chuka hai — LEAD_READY marker DOBARA MAT LIKHO.]' : '';
     const cleanCustomerPhone = senderPhone.replace(/\D/g, '');
@@ -469,7 +521,7 @@ async function handleMessage(client, senderPhone, userText) {
     const aiReply = await callAI({
       provider: client.aiProvider,
       apiKey: client.aiKey,
-      systemPrompt: client.systemPrompt + dateContext + noLeadInstruction + phoneContext,
+      systemPrompt: client.systemPrompt + dateContext + noLeadInstruction + phoneContext + agentContext,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
     });
 
@@ -515,6 +567,37 @@ async function handleMessage(client, senderPhone, userText) {
         .catch(e => console.error('[Booking] handleLead error:', e.message));
     }
 
+    // --- Agentic Action Detection ---
+    const actionMatch = aiReply.match(/\[ACTION_REQUEST:([^|]+)\|([^|]+)\|([^\]]*)\]/);
+    if (actionMatch) {
+      const [, actionType, description, paramsStr] = actionMatch;
+      const autoApprove = (client.autoApproveActions || []).includes(actionType.trim());
+      const crypto = require('crypto');
+      const actionId = crypto.randomUUID().slice(0, 8);
+      const action = {
+        id: actionId,
+        clientId: client.id,
+        type: actionType.trim(),
+        description: description.trim(),
+        params: paramsStr.trim(),
+        customerPhone: senderPhone,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+      if (autoApprove) {
+        await executeAgentAction(client, action);
+        console.log('[Agent] Auto-approved:', actionType);
+      } else {
+        _db.get('pendingActions').push(action).write();
+        const ownerList = (client.ownerPhone || '').split(',').map(p => p.trim().replace(/\D/g,'')).filter(Boolean);
+        if (ownerList.length > 0) {
+          const permMsg = `🤖 *Action Request* [${actionId}]\n━━━━━━━━━━━━━━━\n📋 *${actionType.trim()}*\n${description.trim()}\n\n*HAAN* bolein to karo\n*NAHI* bolein to cancel`;
+          await sendMessage(client.id, ownerList[0], permMsg);
+          console.log('[Agent] Permission requested from owner:', actionType);
+        }
+      }
+    }
+
     if (client.googleSheetWebhook) {
       axios.post(client.googleSheetWebhook, {
         clientName: client.name, userPhone: senderPhone, userMessage: userText,
@@ -525,6 +608,23 @@ async function handleMessage(client, senderPhone, userText) {
     }
   } catch (err) {
     console.error('[WA] handleMessage error:', err.message);
+  }
+}
+
+// --- Execute agent action ---
+async function executeAgentAction(client, action) {
+  try {
+    if (action.type === 'followup') {
+      await sendMessage(client.id, action.customerPhone, action.description);
+    } else if (action.type === 'offer') {
+      await sendMessage(client.id, action.customerPhone, action.description);
+    } else if (action.type === 'appointment') {
+      await sendMessage(client.id, action.customerPhone, `✅ ${action.description}`);
+    }
+    if (_db) _db.get('pendingActions').find({ id: action.id }).assign({ status: 'done' }).write();
+    console.log('[Agent] Action executed:', action.type, action.id);
+  } catch (e) {
+    console.error('[Agent] Action execute error:', e.message);
   }
 }
 
