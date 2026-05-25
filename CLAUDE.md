@@ -271,6 +271,51 @@ appointment → sendMessage(client.id, action.customerPhone, `✅ ${action.descr
 
 ---
 
+## First-Run Onboarding Wizard (OpenClaw-style)
+Jab naya client add hota hai aur owner pehli baar bot number pe message karta hai → bot step-by-step onboarding wizard chalata hai.
+
+### Flow
+```
+Client created via admin panel (onboardingComplete: false)
+  → Owner apne number se bot number pe message bhejta hai
+      → handleOwnerChat() → client.onboardingComplete === false?
+          YES → handleOnboarding() — step-by-step wizard
+          NO  → Normal trainer AI
+```
+
+### 8 Steps (Owner se collect karta hai)
+| Step | Question | DB Field |
+|------|----------|----------|
+| 1 | Mera naam kya rakhna chahte ho? | `onboardingData.botName` |
+| 2 | Aapka naam kya hai? | `onboardingData.ownerName` |
+| 3 | Business ka naam? | `onboardingData.businessName` |
+| 4 | Aap kya karte hain + city/area? | `onboardingData.businessType`, `onboardingData.city` |
+| 5 | Working hours/days? | `onboardingData.workingHours` |
+| 6 | Main products/services + price range? (SKIP allowed) | `onboardingData.services` |
+| 7 | Mujhe mainly kya karna hai? | `onboardingData.botJob` |
+| 8 | Koi special offer/rule? (SKIP allowed) | `onboardingData.specialOffer` |
+
+### After Completion
+- `generateOnboardingPrompt(data)` — complete system prompt generate hota hai with: bot identity, business info, tone, services, LEAD_READY marker, special rules
+- `client.systemPrompt` — DB mein save ho jaata hai
+- `client.onboardingComplete: true` — flag set hota hai
+- Owner ko confirmation message: full summary card
+
+### DB Fields (per client)
+```js
+onboardingComplete: false,   // true when done
+onboardingStep: 0,           // 0-8 current step
+onboardingData: {},          // collected answers object
+```
+
+### Important Notes
+- Existing clients (jo pehle se hain) `onboardingComplete: undefined` → wizard nahi chalega (safe)
+- Naye clients (admin panel se add kiye) → `onboardingComplete: false` → wizard chalega
+- Onboarding ke dauran HAAN/NAHI kaam nahi karta — pehle setup complete karo
+- `client.name` bhi `businessName` se update hota hai setup ke baad
+
+---
+
 ## Owner Training System
 Owner sends messages from `ownerPhone` to bot number → `handleOwnerChat()` routes to AI trainer.
 
@@ -598,6 +643,7 @@ Ye sab features **code mein hain, client config mein nahi** — isliye purane au
 
 | Feature | Sabhi Clients? | Exception / Condition |
 |---------|---------------|----------------------|
+| First-Run Onboarding Wizard | ✅ Sirf naye clients | Existing clients pe nahi chalega (onboardingComplete: undefined) |
 | Owner Training (rules, campaign, leads, stock) | ✅ Sab | — |
 | Agentic AI (HAAN/NAHI permission) | ✅ Sab | — |
 | Image Reading (vision AI) | ✅ Sab Baileys clients | Meta API clients ke liye nahi |
