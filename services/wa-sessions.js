@@ -283,7 +283,13 @@ AUTO-APPROVE RULES:
   Example: "followup ke liye permission mat lena" → [SET_AUTO_APPROVE:followup]
 - Agar owner bole "X ke liye permission lo" ya "X se pehle poocho": [REMOVE_AUTO_APPROVE:X]
   Example: "offer se pehle poocho" → [REMOVE_AUTO_APPROVE:offer]
-- HAAN/NAHI replies system automatically handle karta hai — tum normal baat karo.`;
+- HAAN/NAHI replies system automatically handle karta hai — tum normal baat karo.
+
+SABSE IMPORTANT RULE — JO NAHI KAR SAKTA:
+Agar owner kuch aisa maange jo upar ke kisi bhi marker se possible NAHI hai (koi naya feature, integration, capability jo system mein exist nahi karti), toh clearly aur seedha bolo:
+"Sir, yeh kaam main abhi nahi kar sakta. Iske liye *Sandeep sir* (developer) se request karein — woh mujhe update kar denge. 🙏"
+Yeh mat karo: confuse karo, galat marker use karo, ya seedha mana karo bina explanation ke.
+Jo kaam kar sakta hai woh karo — jo nahi kar sakta woh honestly bolo.`;
 
   try {
     const ownerConvId = `${client.id}_owner_chat`;
