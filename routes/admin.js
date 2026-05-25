@@ -100,7 +100,7 @@ router.post('/clients', (req, res) => {
   try {
     const { name, aiProvider, aiKey, systemPrompt, plan, googleSheetWebhook, reportPhone,
             clientUsername, clientPassword, permissions,
-            greenApiInstanceId, greenApiToken, ownerPhone, leadGroup,
+            greenApiInstanceId, greenApiToken, ownerPhone, leadGroup, botPhone,
             metaPhoneNumberId, metaAccessToken, metaVerifyToken, metaWabaId,
             businessHoursEnabled, businessHoursStart, businessHoursEnd, businessClosedMessage, typingDelayEnabled } = req.body;
     console.log('[Admin] POST /clients — name:', name);
@@ -116,6 +116,7 @@ router.post('/clients', (req, res) => {
       reportPhone: reportPhone || '',
       ownerPhone: ownerPhone || '',
       leadGroup: leadGroup || '',
+      botPhone: botPhone || '',
       greenApiInstanceId: greenApiInstanceId || '',
       greenApiToken: greenApiToken || '',
       status: 'active',
