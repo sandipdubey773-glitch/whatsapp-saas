@@ -179,7 +179,241 @@ async function sendToGroup(clientId, groupId, text) {
 }
 
 // --- Owner trainer chat ---
+// =====================================================
+// ONBOARDING WIZARD — First-time owner setup
+// =====================================================
+function generateOnboardingPrompt(d) {
+  const specialSection = d.specialOffer && d.specialOffer.toUpperCase() !== 'SKIP'
+    ? `\nSPECIAL OFFER / RULE:\n${d.specialOffer}\n` : '';
+  const servicesSection = d.services && d.services.toUpperCase() !== 'SKIP'
+    ? `\nMAIN PRODUCTS / SERVICES:\n${d.services}\n` : '';
+
+  return `Aap ${d.businessName} ki professional customer service executive "${d.botName}" hain.
+Aap ${d.city} mein ${d.businessType} mein customers ki help karte hain.
+
+BUSINESS INFO:
+- Business: ${d.businessName}
+- Type: ${d.businessType}
+- Location: ${d.city}
+- Owner: ${d.ownerName}
+- Working Hours: ${d.workingHours}
+${servicesSection}
+TONE AUR STYLE:
+- Hamesha professional aur respectful rahein
+- Customer ko "Sir" ya "Ma'am" bolkar address karein — kabhi "bhai" mat bolein
+- Hinglish mein baat karein (Hindi + English mix)
+- Short, clear aur warm messages bhejein
+- Emojis bahut kam use karein
+${specialSection}
+AAPKA MAIN KAAM:
+${d.botJob}
+
+CUSTOMER DETAILS ZAROOR LEIN:
+1. Naam
+2. Phone number (10 digit)
+3. Kya chahiye / kya problem hai
+4. Kab chahiye (date)
+5. Area / Location
+
+CONVERSATION FLOW:
+1. Professional greeting karein
+2. Customer ki query sunein
+3. Details collect karein
+4. Confirm karein ki team jald contact karegi
+
+IMPORTANT RULES:
+- Exact price guarantee mat do — "exact price ke liye call/visit karein"
+- Complaint aane pe escalate karein — "Owner se baat karayenge"
+- Hamesha polite aur helpful rahein
+- Working hours ke baad aane wale messages ke liye: "Abhi ${d.workingHours} ke baad hai — kal subah reply karenge"
+
+===================================
+LEAD CAPTURE SYSTEM (CRITICAL RULE)
+===================================
+Jab customer ke paas YAHAN SAB mil jaye:
+- Naam
+- Phone number (10 digit)
+- Kya chahiye / service type
+- Date ya "jaldi chahiye"
+
+Tab apni normal reply ke BILKUL END mein, customer-facing text ke BAAD, ek NAYI LINE pe yeh EXACTLY likho:
+[LEAD_READY:naam=NAAM|mobile=MOBILE10DIGIT|service=SERVICE|area=AREA|date=YYYY-MM-DD]
+
+Rules:
+- Separator PIPE | use karo — comma NAHI
+- mobile: SIRF 10 digits, koi space ya symbol nahi
+- date: YYYY-MM-DD format mein. System tumhe aaj ki date batayega — usi se calculate karo
+- naam: Pehla naam only
+- Yeh line customer ko NAHI dikhti — system automatically handle karta hai
+- SIRF EK BAAR likho — agar pehle likh chuke ho toh DOBARA MAT LIKHNA`;
+}
+
+async function handleOnboarding(client, senderPhone, userText) {
+  const step = client.onboardingStep || 0;
+  const data = client.onboardingData || {};
+
+  const save = (fields) => {
+    _db.get('clients').find({ id: client.id }).assign(fields).write();
+  };
+
+  // Step 0 — Pehla message: Welcome + bot ka naam poocho
+  if (step === 0) {
+    save({ onboardingStep: 1, onboardingData: {} });
+    return sendMessage(client.id, senderPhone,
+`🙏 *Namaste! Main aapka WaFlow AI Bot hun!*
+
+Main abhi setup nahi hua hun. Chaliye mujhe configure karte hain — bas kuch sawaal poochhna hai!
+
+Yeh setup ek baar hota hai — iske baad main puri tarah ready ho jaunga. 🚀
+
+━━━━━━━━━━━━━━━━━━━━━
+*Sawaal 1 / 8*
+Mera naam kya rakhna chahte hain aap?
+_(jaise: Priya, Aryan, Shivi, Robo, etc.)_`);
+  }
+
+  // Step 1 — Bot naam mila → Owner ka naam poocho
+  if (step === 1) {
+    save({ onboardingStep: 2, onboardingData: { ...data, botName: userText.trim() } });
+    return sendMessage(client.id, senderPhone,
+`✅ *${userText.trim()}* — bahut accha naam!
+
+━━━━━━━━━━━━━━━━━━━━━
+*Sawaal 2 / 8*
+Aapka naam kya hai?
+_(Owner ya Manager ka naam)_`);
+  }
+
+  // Step 2 — Owner naam mila → Business ka naam poocho
+  if (step === 2) {
+    save({ onboardingStep: 3, onboardingData: { ...data, ownerName: userText.trim() } });
+    return sendMessage(client.id, senderPhone,
+`Bahut accha, *${userText.trim()} sir/ma'am*! 😊
+
+━━━━━━━━━━━━━━━━━━━━━
+*Sawaal 3 / 8*
+Aapke business ka naam kya hai?`);
+  }
+
+  // Step 3 — Business naam mila → Business type + city
+  if (step === 3) {
+    save({ onboardingStep: 4, onboardingData: { ...data, businessName: userText.trim() } });
+    return sendMessage(client.id, senderPhone,
+`✅ *${userText.trim()}* — note ho gaya!
+
+━━━━━━━━━━━━━━━━━━━━━
+*Sawaal 4 / 8*
+Aap kya karte hain aur aapka business kahan hai?
+
+Dono ek saath batayein:
+_(jaise: "Mobile repair shop, Surat Adajan" ya "Bike service center, Mumbai Andheri")_`);
+  }
+
+  // Step 4 — Business type + city mili → Working hours poocho
+  if (step === 4) {
+    const parts = userText.trim().split(',');
+    const businessType = parts[0]?.trim() || userText.trim();
+    const city = parts.slice(1).join(',').trim() || 'Not specified';
+    save({ onboardingStep: 5, onboardingData: { ...data, businessType, city } });
+    return sendMessage(client.id, senderPhone,
+`Got it! *${businessType}* in *${city}*. 👍
+
+━━━━━━━━━━━━━━━━━━━━━
+*Sawaal 5 / 8*
+Aapki shop / office ke working hours kya hain?
+
+_(jaise: "Subah 10 baje se Raat 8 baje tak, Sunday off" ya "24/7 available")_`);
+  }
+
+  // Step 5 — Working hours mili → Main services/products poocho
+  if (step === 5) {
+    save({ onboardingStep: 6, onboardingData: { ...data, workingHours: userText.trim() } });
+    return sendMessage(client.id, senderPhone,
+`✅ Working hours noted: *${userText.trim()}*
+
+━━━━━━━━━━━━━━━━━━━━━
+*Sawaal 6 / 8*
+Aapke main products / services kya hain?
+
+Price range bhi batayein agar ho:
+_(jaise: "Bike servicing Rs.300-800, Oil change Rs.150, Tyre puncture Rs.50")_
+
+_SKIP likho agar abhi nahi batana_`);
+  }
+
+  // Step 6 — Services mili → Bot ka main kaam poocho
+  if (step === 6) {
+    save({ onboardingStep: 7, onboardingData: { ...data, services: userText.trim() } });
+    return sendMessage(client.id, senderPhone,
+`✅ Services note ho gayi!
+
+━━━━━━━━━━━━━━━━━━━━━
+*Sawaal 7 / 8*
+Mujhe mainly kya karna hai? Customers ke saath main kya kaam karunga?
+
+_(jaise: "Leads lena — naam, number, kya chahiye", "Appointments book karna", "Queries answer karna aur info dena", ya sab ek saath)_`);
+  }
+
+  // Step 7 — Bot job mili → Special rules/offer poocho
+  if (step === 7) {
+    save({ onboardingStep: 8, onboardingData: { ...data, botJob: userText.trim() } });
+    return sendMessage(client.id, senderPhone,
+`✅ Main kaam samajh gaya: *${userText.trim()}*
+
+━━━━━━━━━━━━━━━━━━━━━
+*Sawaal 8 / 8 (Optional)*
+Koi special offer, discount, ya important rule hai jo customers ko pehle batana chahiye?
+
+_(jaise: "Pehli service FREE hai", "10% student discount", "Ghar pe service available hai")_
+
+_SKIP likho agar kuch nahi hai_`);
+  }
+
+  // Step 8 — Sab kuch mila → System prompt generate karo
+  if (step === 8) {
+    const finalData = { ...data, specialOffer: userText.trim() };
+    const newPrompt = generateOnboardingPrompt(finalData);
+
+    save({
+      onboardingComplete: true,
+      onboardingStep: null,
+      onboardingData: finalData,
+      systemPrompt: newPrompt,
+      name: finalData.businessName || client.name,
+    });
+
+    const servicesLine = finalData.services && finalData.services.toUpperCase() !== 'SKIP'
+      ? `\n- ⚙️ Services: ${finalData.services.slice(0, 60)}${finalData.services.length > 60 ? '...' : ''}` : '';
+    const offerLine = finalData.specialOffer && finalData.specialOffer.toUpperCase() !== 'SKIP'
+      ? `\n- ⭐ Special: ${finalData.specialOffer}` : '';
+
+    return sendMessage(client.id, senderPhone,
+`🎉 *Setup Complete! Main bilkul ready hun!*
+
+━━━━━━━━━━━━━━━━━━━━━
+📌 *Meri Details:*
+- 🤖 Mera naam: *${finalData.botName}*
+- 👤 Owner: *${finalData.ownerName} sir/ma'am*
+- 🏢 Business: *${finalData.businessName}*
+- 💼 Type: ${finalData.businessType}
+- 📍 Location: ${finalData.city}
+- 🕒 Hours: ${finalData.workingHours}${servicesLine}
+- 🎯 Kaam: ${finalData.botJob}${offerLine}
+━━━━━━━━━━━━━━━━━━━━━
+
+Ab main customers ko professionally handle kar sakta hun! 🚀
+
+*Kuch aur update karna ho toh mujhse kaho — main yaad rakhta hun!*
+_(jaise: "bot ko yeh rule de...", "aaj ke leads batao", "appointments dikhao")_`);
+  }
+}
+
 async function handleOwnerChat(client, senderPhone, userText) {
+
+  // Onboarding check — naya client setup nahi hua
+  if (client.onboardingComplete === false) {
+    return await handleOnboarding(client, senderPhone, userText);
+  }
 
   // HAAN / NAHI — pending action reply
   const upperText = userText.trim().toUpperCase();

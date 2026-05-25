@@ -135,6 +135,9 @@ router.post('/clients', (req, res) => {
       businessHoursEnd: businessHoursEnd || '20:00',
       businessClosedMessage: businessClosedMessage || 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.',
       typingDelayEnabled: typingDelayEnabled || false,
+      onboardingComplete: false,
+      onboardingStep: 0,
+      onboardingData: {},
     };
     db.get('clients').push(client).write();
     console.log('[Admin] Client created:', client.id);
