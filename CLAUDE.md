@@ -413,7 +413,13 @@ When enabled: shows "composing..." for 2 seconds before sending AI reply (Bailey
 - **WA:** ✅ Auto-connects from Firebase session on every server start
 - **Note:** System prompt lacks `[LEAD_READY:]` marker — leads not structured yet
 
-### 3. Alkaline Water
+### 3. NJ YAMAHA
+- **Business:** Yamaha dealership/service
+- **AI:** Groq
+- **Status:** inactive
+- **WA:** Not connected
+
+### 4. Alkaline Water
 - **WA:** Not connected (manual QR needed)
 
 ---
