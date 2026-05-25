@@ -255,7 +255,10 @@ REPLY RULES:
 - Hamesha Hinglish mein baat kar
 - Short aur clear jawab de
 - Agar owner campaign update kare: [UPDATE_CAMPAIGN:details]
-- Agar naya rule: [ADD_RULE:rule]
+- Agar owner naya rule/instruction save karna chahe (jaise "bot ko yeh rule de", "hamesha ke liye save karo", "yeh sikhao bot ko"): [ADD_RULE:exact rule text]
+- Agar owner rule hatana chahe (jaise "followup wala rule hata do", "yeh rule delete karo"): [REMOVE_RULE:keyword]
+  Note: keyword woh word likho jo us rule mein hai
+- Agar owner saved rules dekhna chahe (jaise "rules batao", "kya rules hain", "kya sikha hai"): [LIST_RULES]
 - Agar "group mein daal": [SEND_META_LEADS_TO_GROUP]
 - Agar "report do": [SEND_REPORT]
 - Agar owner koi bhi message group mein bhejne ko kahe (jaise "group mein likho: Aaj band hai"): [SEND_GROUP:exact message here]
@@ -312,9 +315,33 @@ AUTO-APPROVE RULES:
 
     const ruleMatch = aiReply.match(/\[ADD_RULE:([\s\S]*?)\]/);
     if (ruleMatch) {
-      const prompt = client.systemPrompt + `\n\n[OWNER RULE]: ${ruleMatch[1].trim()}`;
+      const newRule = ruleMatch[1].trim();
+      const prompt = client.systemPrompt + `\n\n[OWNER RULE]: ${newRule}`;
       db.get('clients').find({ id: client.id }).assign({ systemPrompt: prompt }).write();
       cleanReply = cleanReply.replace(/\[ADD_RULE:[\s\S]*?\]/g, '').trim();
+      cleanReply += `\n\n✅ *Rule save ho gaya!* Bot ab hamesha isko follow karega.`;
+    }
+
+    const removeRuleMatch = aiReply.match(/\[REMOVE_RULE:([^\]]+)\]/);
+    if (removeRuleMatch) {
+      const keyword = removeRuleMatch[1].trim().toLowerCase();
+      const lines = client.systemPrompt.split('\n');
+      const filtered = lines.filter(line => !(line.startsWith('[OWNER RULE]:') && line.toLowerCase().includes(keyword)));
+      const newPrompt = filtered.join('\n').trim();
+      _db.get('clients').find({ id: client.id }).assign({ systemPrompt: newPrompt }).write();
+      cleanReply = cleanReply.replace(/\[REMOVE_RULE:[^\]]+\]/g, '').trim();
+      cleanReply += `\n\n🗑️ *Rule hata diya!* System prompt se remove ho gaya.`;
+    }
+
+    if (aiReply.includes('[LIST_RULES]')) {
+      cleanReply = cleanReply.replace(/\[LIST_RULES\]/g, '').trim();
+      const savedRules = client.systemPrompt.split('\n').filter(l => l.startsWith('[OWNER RULE]:'));
+      if (savedRules.length === 0) {
+        cleanReply += `\n\n📋 Abhi koi saved rule nahi hai.`;
+      } else {
+        const ruleLines = savedRules.map((r, i) => `${i + 1}. ${r.replace('[OWNER RULE]:', '').trim()}`).join('\n');
+        cleanReply += `\n\n📋 *Saved Rules (${savedRules.length}):*\n${ruleLines}`;
+      }
     }
 
     const getLeadsMatch = aiReply.match(/\[GET_LEADS:(\d{4}-\d{2}-\d{2})\]/);
