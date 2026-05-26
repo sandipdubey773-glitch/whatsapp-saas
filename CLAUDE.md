@@ -195,6 +195,9 @@ permissions: {
   showroomGroup,          // WhatsApp group ID for showroom stock management
   stockSheetWebhook,      // Google Sheet webhook for stock transactions
   createdAt,              // ISO timestamp
+  exotelSid,              // Exotel Account SID (call masking + recording)
+  exotelToken,            // Exotel API Token
+  exotelCallerId,         // Virtual number — customer ko yahi dikhega when staff calls
   onboardingComplete,     // false = wizard pending | true = done | undefined = existing client (skip)
   onboardingStep,         // 0-8 current step (null when done)
   onboardingData,         // { botName, ownerName, businessName, businessType, city, workingHours, services, botJob, specialOffer }
@@ -703,6 +706,8 @@ Ye sab features **code mein hain, client config mein nahi** — isliye purane au
 | Feature | Sabhi Clients? | Exception / Condition |
 |---------|---------------|----------------------|
 | Multi-Key API Rotation | ✅ Sab | `aiKeys` array set karo — single `aiKey` bhi kaam karta hai |
+| Call Masking + Recording (Exotel) | ✅ Sab | `exotelSid/Token/CallerId` set karna hoga — bina Exotel: tel: fallback |
+| Call + Feedback Buttons (Lead msg) | ✅ Sab | Auto — WhatsApp lead message mein 🟢CALL 🟠FEEDBACK links |
 | First-Run Onboarding Wizard | ✅ Sirf naye clients | Existing clients pe nahi chalega (onboardingComplete: undefined) |
 | Owner Training (rules, campaign, leads, stock) | ✅ Sab | — |
 | Agentic AI (HAAN/NAHI permission) | ✅ Sab | — |
@@ -718,6 +723,65 @@ Ye sab features **code mein hain, client config mein nahi** — isliye purane au
 
 **Trainer limitation response:** Agar owner koi aisa kaam maange jo system support nahi karta, bot bolega:
 *"Sir, yeh kaam main abhi nahi kar sakta. Iske liye Sandeep sir (developer) se request karein — woh mujhe update kar denge. 🙏"*
+
+---
+
+## Call Masking + Recording (Exotel Integration)
+
+Staff jab customer ko call kare → customer ko staff ka personal number na dikhe, sirf virtual number dikhe + call record ho.
+
+### Flow
+```
+Staff → Leads Dashboard → "📞 Call Karo" button click
+  → Exotel API call (POST /booking/leads/:id/exotel-call)
+      → Exotel staff ko call karta hai pehle
+      → Staff uthaye → Exotel customer se connect karta hai
+      → Customer ko sirf virtual number (ExoPhone) dikhta hai ✅
+      → Call record hoti hai ✅
+  → Lead automatically "Called" mark ho jaata hai
+  → Fallback (agar Exotel nahi): direct tel: link
+```
+
+### Exotel Credentials (per client, AddClient form)
+```js
+exotelSid:      // Exotel Account SID
+exotelToken:    // Exotel API Token
+exotelCallerId: // Virtual number (ExoPhone) — customer ko yahi dikhega
+```
+
+### API Route
+```
+POST /booking/leads/:id/exotel-call
+Body: { staffPhone, clientId }
+→ Calls Exotel: https://api.exotel.com/v1/Accounts/{sid}/Calls/connect
+→ Params: From=staffPhone, To=customerPhone, CallerId=virtualNumber, Record=true
+```
+
+### WhatsApp Lead Message (booking.js)
+Jab lead aata hai group/owner ke paas:
+```
+🟢 CALL KARO → https://wa.me/91XXXXXXXXXX   (clickable WhatsApp link)
+🟠 FEEDBACK DO → feedback-url
+```
+
+### Leads Dashboard (LeadsDashboard.jsx)
+- **Staff Phone input** — upar ek baar daalo, localStorage mein save rahega
+- **🟢 Green "📞 Call Karo"** button — Exotel se connect (ya tel: fallback)
+- **🟠 Orange "🟠 Feedback Do"** button — popup mein feedback type + save
+- Called leads pe green border + "✅ Called" badge
+
+### Setup
+1. exotel.com pe account banao
+2. Virtual number (ExoPhone) kharido
+3. SID + Token + ExoPhone → AddClient form mein Exotel section mein daalo
+4. Leads Dashboard mein staff apna number ek baar daale → done
+
+### Client DB Fields Added
+```js
+exotelSid:      '',   // Exotel account SID
+exotelToken:    '',   // Exotel API token
+exotelCallerId: '',   // Virtual number customer ko dikhega
+```
 
 ---
 
