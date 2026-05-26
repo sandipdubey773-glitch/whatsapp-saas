@@ -164,7 +164,8 @@ permissions: {
   id,                     // UUID (lowdb primary key)
   name,                   // Business name
   aiProvider,             // 'gemini' | 'groq' | 'openai' | 'claude' | 'openrouter'
-  aiKey,                  // API key for AI provider
+  aiKey,                  // Primary API key (= aiKeys[0]) — backward compat ke liye
+  aiKeys,                 // string[] — multiple API keys for auto-rotation (1 per line in AddClient form)
   systemPrompt,           // Full system prompt (includes [OWNER RULE]: lines appended by training)
   plan,                   // 'starter' | 'pro'
   status,                 // 'active' | 'inactive'
@@ -650,11 +651,58 @@ node index.js > server.log 2>&1 &
 
 ---
 
+## Multi-Key API Rotation
+
+Ek client ke paas multiple API keys ho sakti hain — jab ek key ki limit aaye, automatically next key pe switch ho jaata hai.
+
+### Kaise Kaam Karta Hai
+```
+Request aaya → current key se try (round-robin)
+  → 429 Rate Limit? → us key ko cooldown (60s) → next key se try
+  → Woh bhi limit? → next → next
+  → Sab cooling? → phir bhi best available key use karo
+  → Success → reply bhejo
+```
+
+### DB Fields
+```js
+aiKey:  "gsk_aaa..."           // primary key (aiKeys[0]) — backward compat
+aiKeys: ["gsk_aaa...", "gsk_bbb...", "gsk_ccc..."]  // full rotation pool
+```
+
+### AddClient Form
+- **API Keys textarea** — ek per line, jitni chahiye
+- Counter dikhata hai: "3 keys added ✅"
+- Save karte waqt: array banta hai, `aiKey = aiKeys[0]`
+
+### Key Rotation State (in-memory, services/ai.js)
+```js
+keyCooldowns     // Map<apiKey, cooldownUntil ms> — 429 pe 60s cooldown
+clientKeyIndexes // Map<clientId_provider, index>  — round-robin position
+```
+State server restart pe reset hoti hai (theek hai — bot re-learns quickly)
+
+### Free Keys Kahan Se Lein
+| Provider | Free Limit/Key | Trick |
+|----------|---------------|-------|
+| **Groq** | 14,400 req/day | Gmail alias: `email+groq1@gmail.com`, `+groq2`, etc. |
+| **Gemini** | 1,500 req/day | Alag Google accounts |
+| **OpenRouter** | Free models | Gmail alias se signup |
+
+**Gmail Alias:** `sandipdubey773+groq1@gmail.com` → Groq samjhe alag email, mail same inbox mein aaye. 10 aliases × 14,400 = 1,44,000 req/day → practically unlimited.
+
+### Backward Compatible
+- Purane clients jo sirf `aiKey` use karte hain → kaam karte rahenge
+- Naye clients `aiKeys` array use karein → rotation automatically hogi
+
+---
+
 ## Feature Availability — Sabhi Clients
 Ye sab features **code mein hain, client config mein nahi** — isliye purane aur naye sab clients pe automatically active hain. Alag se koi setup nahi chahiye.
 
 | Feature | Sabhi Clients? | Exception / Condition |
 |---------|---------------|----------------------|
+| Multi-Key API Rotation | ✅ Sab | `aiKeys` array set karo — single `aiKey` bhi kaam karta hai |
 | First-Run Onboarding Wizard | ✅ Sirf naye clients | Existing clients pe nahi chalega (onboardingComplete: undefined) |
 | Owner Training (rules, campaign, leads, stock) | ✅ Sab | — |
 | Agentic AI (HAAN/NAHI permission) | ✅ Sab | — |
