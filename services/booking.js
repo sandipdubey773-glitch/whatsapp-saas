@@ -139,7 +139,7 @@ async function handleLead(clientId, leadData, customerJid) {
       let changed = false;
       if (leadData.naam && !existing.naam) { existing.naam = leadData.naam; changed = true; }
       if (!existing.mobile) { const m = leadData.mobile || jidMobile; if (m) { existing.mobile = m; changed = true; } }
-      if (leadData.vehicle && !existing.vehicle) { existing.vehicle = leadData.vehicle; changed = true; }
+      if ((leadData.vehicle || leadData.service) && !existing.vehicle) { existing.vehicle = leadData.vehicle || leadData.service; changed = true; }
       if (leadData.area && !existing.area) { existing.area = leadData.area; changed = true; }
       if (changed) {
         saveData(data);
@@ -164,7 +164,7 @@ async function handleLead(clientId, leadData, customerJid) {
     createdDate,
     naam: leadData.naam || '',
     mobile: leadData.mobile || jidMobile,
-    vehicle: leadData.vehicle || '',
+    vehicle: leadData.vehicle || leadData.service || '',
     area: leadData.area || '',
     source: leadData.source || 'meta_ads',
     preferredDate: preferred || '',
