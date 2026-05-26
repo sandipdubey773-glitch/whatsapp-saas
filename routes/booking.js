@@ -102,7 +102,7 @@ router.get('/leads', (req, res) => {
   }
 });
 
-// POST /booking/leads/:id/call — mark lead as called (phone dialer click)
+// POST /booking/leads/:id/call — mark lead as called
 router.post('/leads/:id/call', (req, res) => {
   try {
     const success = booking.markCalled(req.params.id);
@@ -110,6 +110,56 @@ router.post('/leads/:id/call', (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /booking/leads/:id/exotel-call — Exotel click-to-call
+router.post('/leads/:id/exotel-call', async (req, res) => {
+  try {
+    const { staffPhone, clientId } = req.body;
+    if (!staffPhone || !clientId) return res.status(400).json({ error: 'staffPhone aur clientId required' });
+
+    const db = require('../db');
+    const axios = require('axios');
+
+    const client = db.get('clients').find({ id: clientId }).value();
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const { exotelSid, exotelToken, exotelCallerId } = client;
+    if (!exotelSid || !exotelToken || !exotelCallerId) {
+      return res.status(400).json({ error: 'Exotel credentials set nahi hain — Admin se kaho AddClient mein daale' });
+    }
+
+    const leadData = booking.loadData ? booking.loadData() : null;
+    const lead = leadData?.leads?.find(l => l.id === req.params.id);
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+    const customerPhone = (lead.mobile || '').replace(/\D/g, '');
+    const fromPhone = staffPhone.replace(/\D/g, '');
+
+    const auth = Buffer.from(`${exotelSid}:${exotelToken}`).toString('base64');
+    const params = new URLSearchParams({
+      From: fromPhone,
+      To: customerPhone,
+      CallerId: exotelCallerId,
+      Record: 'true',
+      TimeLimit: '3600',
+    });
+
+    const exoRes = await axios.post(
+      `https://api.exotel.com/v1/Accounts/${exotelSid}/Calls/connect`,
+      params.toString(),
+      { headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    // Mark lead as called
+    booking.markCalled(req.params.id);
+
+    console.log('[Exotel] Call initiated — Staff:', fromPhone, '→ Customer:', customerPhone);
+    res.json({ success: true, callSid: exoRes.data?.Call?.Sid || 'initiated' });
+  } catch (err) {
+    console.error('[Exotel] Error:', err.response?.data || err.message);
+    res.status(500).json({ error: err.response?.data?.RestException?.Message || err.message });
   }
 });
 

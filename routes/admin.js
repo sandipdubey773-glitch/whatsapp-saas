@@ -191,6 +191,9 @@ router.put('/clients/:id', (req, res) => {
     if (body.businessClosedMessage !== undefined)  updates.businessClosedMessage = body.businessClosedMessage;
     if (body.typingDelayEnabled !== undefined)     updates.typingDelayEnabled = body.typingDelayEnabled;
     if (body.botPhone !== undefined)               updates.botPhone = body.botPhone;
+    if (body.exotelSid !== undefined)              updates.exotelSid = body.exotelSid;
+    if (body.exotelToken !== undefined)            updates.exotelToken = body.exotelToken;
+    if (body.exotelCallerId !== undefined)         updates.exotelCallerId = body.exotelCallerId;
     if (body.aiKeys !== undefined) {
       const keys = Array.isArray(body.aiKeys) ? body.aiKeys.filter(Boolean) : [];
       updates.aiKeys = keys;

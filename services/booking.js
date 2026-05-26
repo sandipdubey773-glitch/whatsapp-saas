@@ -224,16 +224,19 @@ async function sendToTeamGroup(clientId, lead, dateChanged, assignedDate) {
 
   const sourceTag = lead.source === 'meta_5min' ? '⏰ 5-min Auto Lead' : '🤖 Bot Lead';
 
+  const rawPhone = (lead.mobile || '').replace(/\D/g, '');
+  const waCallLink = rawPhone ? `https://wa.me/${rawPhone.startsWith('91') ? rawPhone : '91' + rawPhone}` : null;
   const msg = `🔔 *NEW LEAD — ${client.name}*
 ━━━━━━━━━━━━━━━━━━━━━
 📋 *Lead ${lead.leadNum}* — ${lead.createdDate} | ${sourceTag}
 👤 *Naam:* ${lead.naam || '❓ N/A'}
 📞 *Phone:* ${callNum}
-🏍️ *Vehicle:* ${lead.vehicle || '❓ N/A'}
+🏍️ *Vehicle/Service:* ${lead.vehicle || '❓ N/A'}
 📍 *Area:* ${lead.area || '❓ N/A'}
 ${dateNote}
 ━━━━━━━━━━━━━━━━━━━━━
-✏️ *Feedback:* ${APP_URL}/f/${lead.id}`;
+🟢 *CALL KARO* ${waCallLink ? `→ ${waCallLink}` : `→ ${callNum}`}
+🟠 *FEEDBACK DO* → ${APP_URL}/f/${lead.id}`;
 
   try {
     await _waSessions.sendToGroup(clientId, client.leadGroup, msg);
@@ -252,15 +255,18 @@ async function sendToOwnerPersonal(clientId, lead) {
 
   const callNum = resolveCallNumber(lead);
 
+  const rawPhone2 = (lead.mobile || '').replace(/\D/g, '');
+  const waCallLink2 = rawPhone2 ? `https://wa.me/${rawPhone2.startsWith('91') ? rawPhone2 : '91' + rawPhone2}` : null;
   const msg = `🔔 *Naya Lead — Lead ${lead.leadNum}!*
 ━━━━━━━━━━━━━━━━━━━━━
 👤 *Naam:* ${lead.naam || '❓ N/A'}
 📞 *Phone:* ${callNum}
-🏍️ *Vehicle:* ${lead.vehicle || '❓ N/A'}
+🏍️ *Vehicle/Service:* ${lead.vehicle || '❓ N/A'}
 📍 *Area:* ${lead.area || '❓ N/A'}
 📅 *Date:* ${lead.createdDate}
 ━━━━━━━━━━━━━━━━━━━━━
-✏️ *Feedback:* ${APP_URL}/f/${lead.id}`;
+🟢 *CALL KARO* ${waCallLink2 ? `→ ${waCallLink2}` : `→ ${callNum}`}
+🟠 *FEEDBACK DO* → ${APP_URL}/f/${lead.id}`;
 
   try {
     await _waSessions.sendMessage(clientId, client.reportPhone, msg);

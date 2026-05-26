@@ -64,7 +64,7 @@ Rules:
 - Yeh line customer ko NAHI dikhti — system automatically handle karta hai
 - SIRF EK BAAR likho — agar pehle likh chuke ho toh DOBARA MAT LIKHNA`;
 
-const blank = { name: '', aiProvider: 'gemini', aiKey: '', aiKeysText: '', systemPrompt: DEMO_PROMPT, plan: 'starter', googleSheetWebhook: '', reportPhone: '', ownerPhone: '', leadGroup: '', botPhone: '', metaPhoneNumberId: '', metaAccessToken: '', metaVerifyToken: '', metaWabaId: '', clientUsername: '', clientPassword: '', permissions: {}, businessHoursEnabled: false, businessHoursStart: '09:00', businessHoursEnd: '20:00', businessClosedMessage: 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: false };
+const blank = { name: '', aiProvider: 'gemini', aiKey: '', aiKeysText: '', exotelSid: '', exotelToken: '', exotelCallerId: '', systemPrompt: DEMO_PROMPT, plan: 'starter', googleSheetWebhook: '', reportPhone: '', ownerPhone: '', leadGroup: '', botPhone: '', metaPhoneNumberId: '', metaAccessToken: '', metaVerifyToken: '', metaWabaId: '', clientUsername: '', clientPassword: '', permissions: {}, businessHoursEnabled: false, businessHoursStart: '09:00', businessHoursEnd: '20:00', businessClosedMessage: 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: false };
 const inp = { width: '100%', background: '#0f172a', border: '1.5px solid #334155', borderRadius: 9, padding: '11px 13px', fontSize: 14, color: '#e2e8f0', outline: 'none', fontFamily: 'inherit' };
 const sel = { ...inp, appearance: 'none', cursor: 'pointer' };
 const lbl = { display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 };
@@ -82,7 +82,7 @@ export default function AddClient() {
     if (!isEdit) return;
     api.getClients().then(clients => {
       const c = (Array.isArray(clients) ? clients : clients.clients || []).find(c => c.id === id);
-      if (c) setForm({ name: c.name || '', aiProvider: c.aiProvider || 'gemini', aiKey: c.aiKey || '', aiKeysText: (c.aiKeys || []).join('\n') || c.aiKey || '', systemPrompt: c.systemPrompt || '', plan: c.plan || 'starter', googleSheetWebhook: c.googleSheetWebhook || '', reportPhone: c.reportPhone || '', ownerPhone: c.ownerPhone || '', leadGroup: c.leadGroup || '', botPhone: c.botPhone || '', metaPhoneNumberId: c.metaPhoneNumberId || '', metaAccessToken: c.metaAccessToken || '', metaVerifyToken: c.metaVerifyToken || '', metaWabaId: c.metaWabaId || '', clientUsername: c.clientUsername || '', clientPassword: c.clientPassword || '', permissions: c.permissions || {}, businessHoursEnabled: c.businessHoursEnabled || false, businessHoursStart: c.businessHoursStart || '09:00', businessHoursEnd: c.businessHoursEnd || '20:00', businessClosedMessage: c.businessClosedMessage || 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: c.typingDelayEnabled || false });
+      if (c) setForm({ name: c.name || '', aiProvider: c.aiProvider || 'gemini', aiKey: c.aiKey || '', aiKeysText: (c.aiKeys || []).join('\n') || c.aiKey || '', exotelSid: c.exotelSid || '', exotelToken: c.exotelToken || '', exotelCallerId: c.exotelCallerId || '', systemPrompt: c.systemPrompt || '', plan: c.plan || 'starter', googleSheetWebhook: c.googleSheetWebhook || '', reportPhone: c.reportPhone || '', ownerPhone: c.ownerPhone || '', leadGroup: c.leadGroup || '', botPhone: c.botPhone || '', metaPhoneNumberId: c.metaPhoneNumberId || '', metaAccessToken: c.metaAccessToken || '', metaVerifyToken: c.metaVerifyToken || '', metaWabaId: c.metaWabaId || '', clientUsername: c.clientUsername || '', clientPassword: c.clientPassword || '', permissions: c.permissions || {}, businessHoursEnabled: c.businessHoursEnabled || false, businessHoursStart: c.businessHoursStart || '09:00', businessHoursEnd: c.businessHoursEnd || '20:00', businessClosedMessage: c.businessClosedMessage || 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: c.typingDelayEnabled || false });
     }).catch(console.error);
   }, [id]);
 
@@ -282,6 +282,27 @@ export default function AddClient() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Exotel */}
+        <div style={card}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>📞 Exotel — Call Masking + Recording (Optional)</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>Staff jo call karein → customer ko sirf virtual number dikhega + call record hogi</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+            <div>
+              <label style={lbl}>Account SID</label>
+              <input style={inp} value={form.exotelSid || ''} onChange={e => set('exotelSid', e.target.value)} placeholder="your_exotel_sid" />
+            </div>
+            <div>
+              <label style={lbl}>API Token</label>
+              <input style={inp} type="password" value={form.exotelToken || ''} onChange={e => set('exotelToken', e.target.value)} placeholder="your_exotel_token" />
+            </div>
+          </div>
+          <div>
+            <label style={lbl}>Virtual Number (ExoPhone — Customer ko yahi dikhega)</label>
+            <input style={inp} value={form.exotelCallerId || ''} onChange={e => set('exotelCallerId', e.target.value)} placeholder="0XXXXXXXXXX" />
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>exotel.com → Numbers → apna virtual number — customers ko yahi dikhega jab call aayegi</div>
+          </div>
         </div>
 
         {/* Report + Sheet */}
