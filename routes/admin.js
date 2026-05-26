@@ -98,11 +98,13 @@ router.get('/clients', (req, res) => {
 // POST /admin/clients
 router.post('/clients', (req, res) => {
   try {
-    const { name, aiProvider, aiKey, systemPrompt, plan, googleSheetWebhook, reportPhone,
+    const { name, aiProvider, aiKey, aiKeys, systemPrompt, plan, googleSheetWebhook, reportPhone,
             clientUsername, clientPassword, permissions,
             greenApiInstanceId, greenApiToken, ownerPhone, leadGroup, botPhone,
             metaPhoneNumberId, metaAccessToken, metaVerifyToken, metaWabaId,
             businessHoursEnabled, businessHoursStart, businessHoursEnd, businessClosedMessage, typingDelayEnabled } = req.body;
+    const resolvedKeys = Array.isArray(aiKeys) ? aiKeys.filter(Boolean) : (aiKey ? [aiKey] : []);
+    const resolvedKey  = resolvedKeys[0] || aiKey || '';
     console.log('[Admin] POST /clients — name:', name);
     if (!name || !aiProvider || !aiKey || !systemPrompt) {
       return res.status(400).json({ error: 'name, aiProvider, aiKey, systemPrompt required' });
@@ -110,7 +112,7 @@ router.post('/clients', (req, res) => {
     const crypto = require('crypto');
     const client = {
       id: crypto.randomUUID(),
-      name, aiProvider, aiKey, systemPrompt,
+      name, aiProvider, aiKey: resolvedKey, aiKeys: resolvedKeys, systemPrompt,
       plan: plan || 'starter',
       googleSheetWebhook: googleSheetWebhook || '',
       reportPhone: reportPhone || '',
@@ -189,6 +191,11 @@ router.put('/clients/:id', (req, res) => {
     if (body.businessClosedMessage !== undefined)  updates.businessClosedMessage = body.businessClosedMessage;
     if (body.typingDelayEnabled !== undefined)     updates.typingDelayEnabled = body.typingDelayEnabled;
     if (body.botPhone !== undefined)               updates.botPhone = body.botPhone;
+    if (body.aiKeys !== undefined) {
+      const keys = Array.isArray(body.aiKeys) ? body.aiKeys.filter(Boolean) : [];
+      updates.aiKeys = keys;
+      if (keys.length > 0) updates.aiKey = keys[0]; // primary key sync
+    }
     db.get('clients').find({ id }).assign(updates).write();
     console.log('[Admin] Updated client:', id);
     res.json({ success: true });

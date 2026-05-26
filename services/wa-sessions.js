@@ -540,6 +540,8 @@ Jo kaam kar sakta hai woh karo — jo nahi kar sakta woh honestly bolo.`;
     const aiReply = await callAI({
       provider: client.aiProvider,
       apiKey: client.aiKey,
+      apiKeys: client.aiKeys || [],
+      clientId: client.id,
       systemPrompt: TRAINER_PROMPT,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
     });
@@ -830,6 +832,8 @@ Agar customer frustrated/angry/upset lage: [SENTIMENT:negative|reason in 10 word
     const aiReply = await callAI({
       provider: client.aiProvider,
       apiKey: client.aiKey,
+      apiKeys: client.aiKeys || [],
+      clientId: client.id,
       systemPrompt: client.systemPrompt + dateContext + noLeadInstruction + phoneContext + agentContext + aptContext,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       imageData,
@@ -1195,8 +1199,9 @@ async function handleIncoming(msg, clientId) {
     try {
       const s = sessions.get(clientId);
       const buffer = await downloadMediaMessage(msg, 'buffer', {}, {});
-      if (client.aiProvider === 'groq' && client.aiKey) {
-        const transcribed = await whisper.transcribeAudio(buffer, client.aiKey);
+      const groqKey = (client.aiKeys || []).filter(Boolean)[0] || client.aiKey;
+      if (client.aiProvider === 'groq' && groqKey) {
+        const transcribed = await whisper.transcribeAudio(buffer, groqKey);
         if (transcribed.trim()) {
           console.log(`[Whisper] Transcribed for ${senderPhone}:`, transcribed.slice(0, 60));
           await handleMessage(client, senderPhone, `[Voice]: ${transcribed}`);

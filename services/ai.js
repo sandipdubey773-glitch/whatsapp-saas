@@ -2,68 +2,97 @@ const axios = require('axios');
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function callAI({ provider, apiKey, systemPrompt, messages, imageData = null }) {
-  console.log('[AI] Provider:', provider, '| Messages:', messages.length);
-  const maxRetries = 3;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+// --- Key Rotation State (in-memory) ---
+const keyCooldowns = new Map();    // apiKey → cooldownUntil (ms timestamp)
+const clientKeyIndexes = new Map(); // `clientId_provider` → current index
+
+function getNextKey(keys, indexKey) {
+  const now = Date.now();
+  const available = keys.filter(k => (keyCooldowns.get(k) || 0) < now);
+  const pool = available.length > 0 ? available : keys; // fallback: use all even if cooling
+  const idx = (clientKeyIndexes.get(indexKey) || 0) % pool.length;
+  clientKeyIndexes.set(indexKey, (idx + 1) % pool.length);
+  return pool[idx];
+}
+
+function getKeyStatus(keys) {
+  const now = Date.now();
+  return keys.map((k, i) => {
+    const coolUntil = keyCooldowns.get(k) || 0;
+    const isCooling = coolUntil > now;
+    return { index: i + 1, status: isCooling ? 'cooling' : 'active', coolSecsLeft: isCooling ? Math.round((coolUntil - now) / 1000) : 0 };
+  });
+}
+
+async function callAI({ provider, apiKey, apiKeys, systemPrompt, messages, imageData = null, clientId = 'default' }) {
+  // Build keys array — apiKeys array takes priority, fallback to single apiKey
+  const keys = (apiKeys || []).filter(Boolean).length
+    ? (apiKeys || []).filter(Boolean)
+    : [apiKey].filter(Boolean);
+
+  if (keys.length === 0) throw new Error('No API key provided');
+
+  const indexKey = `${clientId}_${provider}`;
+  // Max attempts = each key tried at least once + 2 extra for 503/500 retries
+  const maxAttempts = keys.length + 2;
+
+  console.log(`[AI] Provider: ${provider} | Keys: ${keys.length} | Messages: ${messages.length}`);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const currentKey = getNextKey(keys, indexKey);
+    const keyLabel = keys.length > 1 ? ` [key ${keys.indexOf(currentKey) + 1}/${keys.length}]` : '';
     try {
-      if (provider === 'gemini') return await callGemini(apiKey, systemPrompt, messages, imageData);
-      if (provider === 'openai') return await callOpenAI(apiKey, systemPrompt, messages, imageData);
-      if (provider === 'claude') return await callClaude(apiKey, systemPrompt, messages);
-      if (provider === 'openrouter') return await callOpenRouter(apiKey, systemPrompt, messages);
-      if (provider === 'groq') return await callGroq(apiKey, systemPrompt, messages, imageData);
+      if (provider === 'gemini')     return await callGemini(currentKey, systemPrompt, messages, imageData);
+      if (provider === 'openai')     return await callOpenAI(currentKey, systemPrompt, messages, imageData);
+      if (provider === 'claude')     return await callClaude(currentKey, systemPrompt, messages);
+      if (provider === 'openrouter') return await callOpenRouter(currentKey, systemPrompt, messages);
+      if (provider === 'groq')       return await callGroq(currentKey, systemPrompt, messages, imageData);
       throw new Error('Unknown AI provider: ' + provider);
     } catch (err) {
       const status = err.response?.status;
-      const isRetryable = status === 503 || status === 429 || status === 500;
-      if (isRetryable && attempt < maxRetries) {
-        // Gemini 429 response mein "retry in Xs" hota hai — use that + buffer
-        let wait = attempt * 15000; // default: 15s, 30s
-        if (status === 429) {
-          const msg = err.response?.data?.error?.message || '';
-          const match = msg.match(/retry in ([\d.]+)s/i);
-          if (match) wait = Math.ceil(parseFloat(match[1]) * 1000) + 3000;
-        }
-        console.log(`[AI] ${provider} ${status} — retry ${attempt}/${maxRetries} in ${Math.round(wait/1000)}s`);
+
+      if (status === 429) {
+        // Cooldown this specific key, immediately try next
+        const msg = err.response?.data?.error?.message || '';
+        const retryMatch = msg.match(/retry in ([\d.]+)s/i);
+        const coolMs = retryMatch ? Math.ceil(parseFloat(retryMatch[1]) * 1000) + 2000 : 60000;
+        keyCooldowns.set(currentKey, Date.now() + coolMs);
+        console.log(`[AI] ${provider}${keyLabel} rate limited — cooling ${Math.round(coolMs/1000)}s — switching key (attempt ${attempt}/${maxAttempts})`);
+        continue; // try next key immediately
+      }
+
+      if ((status === 503 || status === 500) && attempt < maxAttempts) {
+        const wait = attempt * 8000;
+        console.log(`[AI] ${provider}${keyLabel} ${status} — retry in ${wait/1000}s (attempt ${attempt}/${maxAttempts})`);
         await sleep(wait);
         continue;
       }
-      console.error('[AI] Error from', provider, ':', err.response?.data || err.message);
+
+      console.error(`[AI] Error from ${provider}${keyLabel}:`, err.response?.data || err.message);
       throw err;
     }
   }
+  throw new Error(`[AI] All ${keys.length} key(s) exhausted for ${provider}`);
 }
 
 async function callGemini(apiKey, systemPrompt, messages, imageData = null) {
   const contents = messages.map((m, idx) => {
     const isLast = idx === messages.length - 1;
     const parts = [];
-
-    // Image sirf last user message ke saath bhejo
     if (isLast && m.role === 'user' && imageData) {
       parts.push({ inlineData: { mimeType: imageData.mimeType, data: imageData.data } });
     }
-
     parts.push({ text: m.content || '.' });
-
-    return {
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts,
-    };
+    return { role: m.role === 'assistant' ? 'model' : 'user', parts };
   });
 
-  // Image ho toh vision model use karo
   const model = imageData ? 'gemini-1.5-flash' : 'gemini-2.5-flash-lite';
   const res = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents,
-    }
+    { system_instruction: { parts: [{ text: systemPrompt }] }, contents }
   );
-
   const reply = res.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  console.log('[AI] Gemini reply length:', reply.length, imageData ? `(${model} with image)` : '');
+  console.log('[AI] Gemini reply length:', reply.length, imageData ? `(${model} vision)` : '');
   return reply;
 }
 
@@ -76,13 +105,7 @@ async function callClaude(apiKey, systemPrompt, messages) {
       system: systemPrompt,
       messages: messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
     },
-    {
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-    }
+    { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' } }
   );
   const reply = res.data.content?.[0]?.text || '';
   console.log('[AI] Claude reply length:', reply.length);
@@ -110,7 +133,6 @@ async function callOpenAI(apiKey, systemPrompt, messages, imageData = null) {
     { model, messages: [{ role: 'system', content: systemPrompt }, ...formattedMessages] },
     { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
   );
-
   const reply = res.data.choices?.[0]?.message?.content || '';
   console.log('[AI] OpenAI reply length:', reply.length, imageData ? `(${model} vision)` : '');
   return reply;
@@ -124,14 +146,9 @@ async function callOpenRouter(apiKey, systemPrompt, messages) {
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
     },
     {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://whatsapp-saas.app',
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://whatsapp-saas.app' },
     }
   );
-
   const reply = res.data.choices?.[0]?.message?.content || '';
   console.log('[AI] OpenRouter reply length:', reply.length);
   return reply;
@@ -155,11 +172,7 @@ async function callGroq(apiKey, systemPrompt, messages, imageData = null) {
   const model = imageData ? 'llama-3.2-90b-vision-preview' : 'llama-3.3-70b-versatile';
   const res = await axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
-    {
-      model,
-      messages: [{ role: 'system', content: systemPrompt }, ...formattedMessages],
-      max_tokens: 1024,
-    },
+    { model, messages: [{ role: 'system', content: systemPrompt }, ...formattedMessages], max_tokens: 1024 },
     { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
   );
   const reply = res.data.choices?.[0]?.message?.content || '';
@@ -167,4 +180,4 @@ async function callGroq(apiKey, systemPrompt, messages, imageData = null) {
   return reply;
 }
 
-module.exports = { callAI };
+module.exports = { callAI, getKeyStatus };

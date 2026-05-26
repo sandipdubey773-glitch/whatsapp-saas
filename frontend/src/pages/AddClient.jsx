@@ -64,7 +64,7 @@ Rules:
 - Yeh line customer ko NAHI dikhti — system automatically handle karta hai
 - SIRF EK BAAR likho — agar pehle likh chuke ho toh DOBARA MAT LIKHNA`;
 
-const blank = { name: '', aiProvider: 'gemini', aiKey: '', systemPrompt: DEMO_PROMPT, plan: 'starter', googleSheetWebhook: '', reportPhone: '', ownerPhone: '', leadGroup: '', botPhone: '', metaPhoneNumberId: '', metaAccessToken: '', metaVerifyToken: '', metaWabaId: '', clientUsername: '', clientPassword: '', permissions: {}, businessHoursEnabled: false, businessHoursStart: '09:00', businessHoursEnd: '20:00', businessClosedMessage: 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: false };
+const blank = { name: '', aiProvider: 'gemini', aiKey: '', aiKeysText: '', systemPrompt: DEMO_PROMPT, plan: 'starter', googleSheetWebhook: '', reportPhone: '', ownerPhone: '', leadGroup: '', botPhone: '', metaPhoneNumberId: '', metaAccessToken: '', metaVerifyToken: '', metaWabaId: '', clientUsername: '', clientPassword: '', permissions: {}, businessHoursEnabled: false, businessHoursStart: '09:00', businessHoursEnd: '20:00', businessClosedMessage: 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: false };
 const inp = { width: '100%', background: '#0f172a', border: '1.5px solid #334155', borderRadius: 9, padding: '11px 13px', fontSize: 14, color: '#e2e8f0', outline: 'none', fontFamily: 'inherit' };
 const sel = { ...inp, appearance: 'none', cursor: 'pointer' };
 const lbl = { display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 };
@@ -82,7 +82,7 @@ export default function AddClient() {
     if (!isEdit) return;
     api.getClients().then(clients => {
       const c = (Array.isArray(clients) ? clients : clients.clients || []).find(c => c.id === id);
-      if (c) setForm({ name: c.name || '', aiProvider: c.aiProvider || 'gemini', aiKey: c.aiKey || '', systemPrompt: c.systemPrompt || '', plan: c.plan || 'starter', googleSheetWebhook: c.googleSheetWebhook || '', reportPhone: c.reportPhone || '', ownerPhone: c.ownerPhone || '', leadGroup: c.leadGroup || '', botPhone: c.botPhone || '', metaPhoneNumberId: c.metaPhoneNumberId || '', metaAccessToken: c.metaAccessToken || '', metaVerifyToken: c.metaVerifyToken || '', metaWabaId: c.metaWabaId || '', clientUsername: c.clientUsername || '', clientPassword: c.clientPassword || '', permissions: c.permissions || {}, businessHoursEnabled: c.businessHoursEnabled || false, businessHoursStart: c.businessHoursStart || '09:00', businessHoursEnd: c.businessHoursEnd || '20:00', businessClosedMessage: c.businessClosedMessage || 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: c.typingDelayEnabled || false });
+      if (c) setForm({ name: c.name || '', aiProvider: c.aiProvider || 'gemini', aiKey: c.aiKey || '', aiKeysText: (c.aiKeys || []).join('\n') || c.aiKey || '', systemPrompt: c.systemPrompt || '', plan: c.plan || 'starter', googleSheetWebhook: c.googleSheetWebhook || '', reportPhone: c.reportPhone || '', ownerPhone: c.ownerPhone || '', leadGroup: c.leadGroup || '', botPhone: c.botPhone || '', metaPhoneNumberId: c.metaPhoneNumberId || '', metaAccessToken: c.metaAccessToken || '', metaVerifyToken: c.metaVerifyToken || '', metaWabaId: c.metaWabaId || '', clientUsername: c.clientUsername || '', clientPassword: c.clientPassword || '', permissions: c.permissions || {}, businessHoursEnabled: c.businessHoursEnabled || false, businessHoursStart: c.businessHoursStart || '09:00', businessHoursEnd: c.businessHoursEnd || '20:00', businessClosedMessage: c.businessClosedMessage || 'Humari shop abhi band hai. Hum kal subah open hote hi aapko reply karenge.', typingDelayEnabled: c.typingDelayEnabled || false });
     }).catch(console.error);
   }, [id]);
 
@@ -90,12 +90,14 @@ export default function AddClient() {
   const togglePerm = (key) => setForm(f => ({ ...f, permissions: { ...f.permissions, [key]: !f.permissions[key] } }));
 
   const handleSave = async () => {
-    if (!form.name || !form.aiKey || !form.systemPrompt) {
-      setError('⚠️ Name, AI Key aur System Prompt required hain'); return;
+    const aiKeys = form.aiKeysText.split('\n').map(k => k.trim()).filter(Boolean);
+    if (!form.name || aiKeys.length === 0 || !form.systemPrompt) {
+      setError('⚠️ Name, AI Key(s) aur System Prompt required hain'); return;
     }
     setLoading(true); setError('');
+    const payload = { ...form, aiKeys, aiKey: aiKeys[0] };
     try {
-      isEdit ? await api.updateClient(id, form) : await api.addClient(form);
+      isEdit ? await api.updateClient(id, payload) : await api.addClient(payload);
       navigate('/');
     } catch (err) {
       setError('❌ ' + (err.response?.data?.error || err.message));
@@ -129,16 +131,32 @@ export default function AddClient() {
         {/* AI */}
         <div style={card}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 18 }}>🤖 AI Config</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
-            <div><label style={lbl}>AI Provider *</label>
-              <select style={sel} value={form.aiProvider} onChange={e => set('aiProvider', e.target.value)}>
-                <option value="claude">Claude (Sabse Smart ⭐)</option>
-                <option value="gemini">Gemini (Free)</option>
-                <option value="openai">OpenAI (GPT-4o)</option>
-                <option value="openrouter">OpenRouter</option>
-              </select>
+          <div style={{ marginBottom: 14 }}>
+            <label style={lbl}>AI Provider *</label>
+            <select style={sel} value={form.aiProvider} onChange={e => set('aiProvider', e.target.value)}>
+              <option value="claude">Claude (Sabse Smart ⭐)</option>
+              <option value="gemini">Gemini (Free)</option>
+              <option value="openai">OpenAI (GPT-4o)</option>
+              <option value="groq">Groq (Free + Fast)</option>
+              <option value="openrouter">OpenRouter</option>
+            </select>
+          </div>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label style={{ ...lbl, marginBottom: 0 }}>API Keys * (ek per line — auto rotation)</label>
+              <span style={{ fontSize: 11, color: form.aiKeysText.split('\n').filter(k => k.trim()).length > 1 ? '#25d366' : '#64748b' }}>
+                {form.aiKeysText.split('\n').filter(k => k.trim()).length} key{form.aiKeysText.split('\n').filter(k => k.trim()).length !== 1 ? 's' : ''} added
+              </span>
             </div>
-            <div><label style={lbl}>API Key *</label><input style={inp} type="password" value={form.aiKey} onChange={e => set('aiKey', e.target.value)} placeholder="AIzaSy... / sk-..." /></div>
+            <textarea
+              style={{ ...inp, minHeight: 90, fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }}
+              value={form.aiKeysText}
+              onChange={e => set('aiKeysText', e.target.value)}
+              placeholder={'AIzaSyXXXXXXXXXXXXXXXXXXXXXXXX\nAIzaSyYYYYYYYYYYYYYYYYYYYYYYYY\nAIzaSyZZZZZZZZZZZZZZZZZZZZZZZZ'}
+            />
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>
+              Jab 1st key ki limit khatam ho → automatically 2nd key pe switch — kabhi limit nahi khatam hogi
+            </div>
           </div>
         </div>
 
