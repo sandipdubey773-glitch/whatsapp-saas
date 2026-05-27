@@ -772,9 +772,27 @@ Jab lead aata hai group/owner ke paas:
 
 ### Setup
 1. exotel.com pe account banao
-2. Virtual number (ExoPhone) kharido
+2. Virtual number (ExoPhone) kharido (~Rs. 1000–2000/month)
 3. SID + Token + ExoPhone → AddClient form mein Exotel section mein daalo
 4. Leads Dashboard mein staff apna number ek baar daale → done
+
+### ⚠️ Personal Number Masking — INDIA MEIN NAHI HOTA
+- **TRAI regulations:** India mein caller ID spoofing illegal hai — apna personal mobile number "hide" karke dusra number dikhana allowed nahi.
+- Exotel ke liye bhi **telecom-registered virtual number** (ExoPhone) kharidna padta hai — personal number se masking kaam nahi karega.
+- Koi bhi app/service jo claim kare ki personal number se masking hogi — woh either illegal hai ya India mein kaam nahi karega.
+
+### Without Exotel — What Happens
+- Staff ka personal number customer ko dikhega (no masking)
+- No call recording
+- Free — koi extra cost nahi
+- Fallback button auto-activate hota hai: direct `tel:` link — staff phone se direct call
+
+### Alternatives (Agar Exotel expensive lage)
+| Option | Cost | Benefit |
+|--------|------|---------|
+| **Exotel ExoPhone** | ~Rs. 1000–2000/month | Full masking + recording ✅ |
+| **Truecaller Business** | Free/~Rs. 500/month | Staff number pe business name dikhega (no full masking) |
+| **Without masking** | Free | Staff number visible, no recording — yahi use karo initially |
 
 ### Client DB Fields Added
 ```js
